@@ -57,8 +57,8 @@ class TeamHP(object):
 
     def __createDataDict(self):
         return {
-            'ally'  : {'maxHP': 0, 'currentHP': 0},
-            'enemy' : {'maxHP': 0, 'currentHP': 0}
+            'ally'  : {'maxHP': 0, 'currentHP': 0, 'maxRegen': 0},
+            'enemy' : {'maxHP': 0, 'currentHP': 0, 'maxRegen': 0}
         }
 
     def update(self, *args):
@@ -67,21 +67,27 @@ class TeamHP(object):
             team = 'ally' if CC.relation in entity and entity[CC.relation].value in ALLY_RELATIONS else 'enemy'
             healthComp = entity[CC.health]
             
+            # Health
             if healthComp and healthComp.max:
                 # Vehicles that are spotted at least once
                 maxValue     = healthComp.max
                 currentValue = healthComp.value
             else:
                 # Vehicles that have never been spotted
-                # From testing, it seems covnerting PlayeInfo object into API_v_1_0.dummy object is very costly and affects the performance
-                # so calling `getPlayerInfo` every frame on every player is not recommended
+                #
+                # From testing, it seems covnerting PlayeInfo object into API_v_1_0.dummy object is very costly and affects the performance badly
+                # Thus, calling `getPlayerInfo` every frame on every player is not recommended
                 # 
                 maxHealth = self._maxHealthMap.get(entity[CC.avatar].id, 0)
                 maxValue     = maxHealth
                 currentValue = maxHealth
-
+            
             data[team]['maxHP'] += maxValue
             data[team]['currentHP'] += currentValue
+
+            # Regen
+            if CC.dataComponent in entity:
+                data[team]['maxRegen'] += getattr(entity[CC.dataComponent].data, 'maxValue', 0)            
 
         self._entity.updateEntity(data)
 
