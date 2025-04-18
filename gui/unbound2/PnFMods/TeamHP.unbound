@@ -1,2 +1,126 @@
+(def constant THP_COMPONENT_KEY 'modTeamHP')
+(def constant THP_HP_PER_BLOCK 10000)
+
 (def element THP_TeamHP () layout=true
+    (scope
+        (var entityWatcher:gfx = "$datahub.getPrimWatcher(CC.mods_DataComponent, THP_COMPONENT_KEY)")
+		(var armamentEntity:gfx = "entityWatcher.entity" (event "entityWatcher.event"))
+		(var dataComponent:gfx = "armamentEntity ? armamentEntity.mods_DataComponent : null")
+		(var healthData:dict = "dataComponent ? dataComponent.data : {}" (event "dataComponent.evDataChanged"))
+    )
+
+    (element THP_TeamHealthItem _healthData="healthData" _isAlly=true)
+    (element THP_TeamHealthItem _healthData="healthData" _isAlly=false)
+)
+
+(def element THP_TeamHealthItem(_healthData:dict, _isAlly:bool=true)
+    (scope
+        (var teamKey:str = "_isAlly ? 'ally' : 'enemy'")
+        (var teamData:dict = "teamKey in _healthData ? _healthData[teamKey] : {}")
+        (var maxHP:number = "'maxHP' in teamData ? teamData.maxHP : 0")
+        (var currentHP:number = "'currentHP' in teamData ? teamData.currentHP : 0")
+        (var maxRegen:number = "'maxRegen' in teamData ? teamData.maxRegen : 0")
+    )
+
+    (style
+        (flow = "Flow.HORIZONTAL")
+        (align = "middle|center")
+    )
+
+    (element THP_TeamHealthBar
+        _currentHP  = "currentHP"
+        _maxHP      = "maxHP"
+        _maxRegen   = "maxRegen"
+        _isAlly     = "_isAlly"
+    )
+    (element THP_TeamHealthValue
+        _currentHP  = "currentHP"
+    )
+)
+
+(def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true)
+    (scope
+        (var currentBlocks:number = "round(_currentHP / THP_HP_PER_BLOCK)")
+        (var maxBlocks:number = "round(_maxHP / THP_HP_PER_BLOCK)")
+        (var regenBlocks:number = "round(_maxRegen / THP_HP_PER_BLOCK)")
+        (var teamColor:number = "_isAlly ? C_ALLY : C_ENEMY")
+    )
+    (hblock
+        (controller $Repeat renderer='THP_HealthBlock'
+            (bind count "maxBlocks")
+            (args
+                _currentBlocks  = "currentBlocks"
+                _regenBlocks    = "regenBlocks"
+                _teamColor      = "teamColor"
+            )
+        )
+    )
+)
+
+(def element THP_HealthBlock(_currentBlocks:number, _regenBlocks:number, _teamColor:number="C_ALLY")
+    (scope
+        (var blockIndex:number = "$index + 1")
+        (var isRegen:bool = "blockIndex <= _regenBlocks")
+        (var isHealth:bool = "blockIndex <= _currentBlocks")
+        (var color:number = "isRegen    ? 0x665c5c5c : 
+                             isHealth   ? _teamColor
+                                        : C_DARK_33 "
+        )
+        (var width:number = 5)
+        (var height:number = 20)
+    )
+    (style
+        (bind height "height")
+        (bind width "width")
+        (bind backgroundColor "color")
+        (marginLeft = 1px)
+        (marginRight = 1px)
+        (pivotX = 50%)
+        (pivotY = 50%)
+    )
+
+    # For animation
+    (block
+        (class $Fullsize)
+        (style
+            (bind backgroundColor "0xffffffff")
+            (pivotX = 50%)
+            (pivotY = 50%)
+            (alpha = 0)
+        )
+        (controller $Animation
+            # Health Reduction
+            (bindcall play
+                duration= 1
+                from    = {visualScaleX: 1.0, visualScaleY: 1.0, alpha:1}
+                to      = {visualScaleX: 2.0, visualScaleY: 3.0, alpha:0}
+                action  = "killAll" 
+                easing  = "Easing.quad_out"
+                (bind enabled "!isHealth")
+                (bind trigger "isHealth")
+            )
+            # Health Addition
+            (bindcall play
+                duration= 1
+                from    = {visualScaleX: 2.0, visualScaleY: 3.0, alpha:0.6}
+                to      = {visualScaleX: 1.0, visualScaleY: 1.0, alpha:0.0}
+                action  = "killAll"
+                easing  = "Easing.cubic_in"
+                (bind enabled "isHealth")
+                (bind trigger "isHealth")
+            )
+        )
+    )
+)
+
+(def element THP_TeamHealthValue(_currentHP:number)
+    (scope
+        (var hpKilo:number = "ceil(_currentHP / 1000)") # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
+        (var prefix:str = "_currentHP < THP_HP_PER_BLOCK ? '<' : ''")
+        (var displayHP:str = "prefix + toString(hpKilo) + 'K' ")
+    )
+    (tf
+        (class $TextDefaultBold18NM)
+        (bind text "displayHP")
+    )
 )
