@@ -1,5 +1,11 @@
+(def constant TT_TEAMHP_INSTALLED "true")
+
 (def constant THP_COMPONENT_KEY 'modTeamHP')
-(def constant THP_HP_PER_BLOCK 10000)
+(def constant THP_ELEMENT_NAME "'teamHP'")
+(def constant THP_HP_PER_BLOCK 25000)
+(def constant THP_BAR_WIDTH 200px)
+(def constant THP_TEXT_WIDTH 50px)
+(def constant THP_BLOCK_WIDTH 10px)
 
 (def element THP_TeamHP () layout=true
     (scope
@@ -7,48 +13,110 @@
 		(var armamentEntity:gfx = "entityWatcher.entity" (event "entityWatcher.event"))
 		(var dataComponent:gfx = "armamentEntity ? armamentEntity.mods_DataComponent : null")
 		(var healthData:dict = "dataComponent ? dataComponent.data : {}" (event "dataComponent.evDataChanged"))
+
+        (macro TT_GET_USERPREF)
     )
 
-    (element THP_TeamHealthItem _healthData="healthData" _isAlly=true)
-    (element THP_TeamHealthItem _healthData="healthData" _isAlly=false)
+    # Ally
+    (element THP_TeamHealthItem _healthData="healthData" _isAlly=true   _userPrefsNum="_userPrefsNum")
+
+    # Enemy
+    (element THP_TeamHealthItem _healthData="healthData" _isAlly=false  _userPrefsNum="_userPrefsNum")  
 )
 
-(def element THP_TeamHealthItem(_healthData:dict, _isAlly:bool=true)
+(def element THP_TeamHealthItem(_healthData:dict, _isAlly:bool=true, _userPrefsNum:gfx=null)
     (scope
         (var teamKey:str = "_isAlly ? 'ally' : 'enemy'")
         (var teamData:dict = "teamKey in _healthData ? _healthData[teamKey] : {}")
         (var maxHP:number = "'maxHP' in teamData ? teamData.maxHP : 0")
         (var currentHP:number = "'currentHP' in teamData ? teamData.currentHP : 0")
         (var maxRegen:number = "'maxRegen' in teamData ? teamData.maxRegen : 0")
+
+        (macro TT_GET_PREF_BOOL   _varName="'isPositionLocked'" 	_pref="THP_PREFS.DISABLE_DRAGDROP")
+
+        (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
+        (macro TT_GET_PREF_BOOL   _varName="'isReversed'"       _pref="revPref.REVERSE")
+        (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
+
+        (macro STAGE_SIZE)
+        (var defaultX:number = "stageWidth / 2 + (_isAlly ? 100 : -100)")
+        (var defaultPos:dict = "{positionX: defaultX, positionY: 50}")
+        (var elementName:str = "THP_ELEMENT_NAME + (_isAlly ? 'Ally' : 'Enemy')")
+        (macro DRAGGABLE_GET_DROP_POSITION _wndName = "elementName" _defaults = "defaultPos")
     )
 
     (style
-        (flow = "Flow.HORIZONTAL")
-        (align = "middle|center")
+        (position = "absolute")
+        (bind left "dragPosX")
+        (bind top "dragPosY")
+        (bind pivotX "isReversed ? 100% : 0%")
     )
 
-    (element THP_TeamHealthBar
-        _currentHP  = "currentHP"
-        _maxHP      = "maxHP"
-        _maxRegen   = "maxRegen"
-        _isAlly     = "_isAlly"
+    # Draggable
+    (controller $Instance renderer='ModDraggableElement'
+        (bind enabled "!isPositionLocked")
+        (args
+            _wndName="elementName"
+            _defaults = "defaultPos"
+        )
     )
-    (element THP_TeamHealthValue
-        _currentHP  = "currentHP"
+
+    # Main
+    (block
+        (style
+            (align = "middle|center")
+            (hitTest = false)
+            (hgap = 5px)
+            (bind flow "flowDir")
+        )
+        # Bar
+        (element THP_TeamHealthBar
+            _currentHP  = "currentHP"
+            _maxHP      = "maxHP"
+            _maxRegen   = "maxRegen"
+            _isAlly     = "_isAlly"
+            _userPrefsNum = "_userPrefsNum"
+        )
+        # Text
+        (element THP_TeamHealthText
+            _currentHP  = "currentHP"
+        )
     )
 )
 
-(def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true)
+(def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true, _userPrefsNum:gfx=null)
     (scope
-        (var currentBlocks:number = "round(_currentHP / THP_HP_PER_BLOCK)")
-        (var maxBlocks:number = "round(_maxHP / THP_HP_PER_BLOCK)")
-        (var regenBlocks:number = "round(_maxRegen / THP_HP_PER_BLOCK)")
+        (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
+        (macro TT_GET_PREF_BOOL   _varName="'isReversed'"       _pref="revPref.REVERSE")
+        (macro TT_GET_PREF_NUMBER _varName="'widthMultiplier'"  _pref="THP_PREFS.BLOCK_WIDTH")
+        (macro TT_GET_PREF_NUMBER _varName="'blockMargin'"	    _pref="THP_PREFS.BLOCK_MARGIN")
+        (macro TT_GET_PREF_NUMBER _varName="'blockCount'"	    _pref="THP_PREFS.BLOCK_COUNT")  # For Relative
+        (macro TT_GET_PREF_NUMBER _varName="'healthPerBlock'"	_pref="THP_PREFS.BLOCK_HEALTH") # For Absolute
+        (macro TT_GET_PREF_NUMBER _varName="'healthType'"	    _pref="THP_PREFS.HEALTH_TYPE")
+
+        (var isRelativeMode:bool = "healthType == 0")
+        
+        # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
+        (var divisor:number = "isRelativeMode ? ceil(_maxHP / blockCount) : healthPerBlock")
+        (var currentBlocks:number = "ceil(_currentHP / divisor)")
+        (var maxBlocks:number = "isRelativeMode ? blockCount : ceil(_maxHP / divisor)")
+        (var regenBlocks:number = "ceil(_maxRegen / divisor)")
+        (var blockWidth:number = "round(THP_BLOCK_WIDTH * widthMultiplier)")
+
         (var teamColor:number = "_isAlly ? C_ALLY : C_ENEMY")
+
+        (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
     )
+
     (hblock
+        (style
+            (bind flow "flowDir")
+        )
         (controller $Repeat renderer='THP_HealthBlock'
             (bind count "maxBlocks")
             (args
+                _blockWidth     = "blockWidth"
+                _blockMargin    = "blockMargin"
                 _currentBlocks  = "currentBlocks"
                 _regenBlocks    = "regenBlocks"
                 _teamColor      = "teamColor"
@@ -57,24 +125,24 @@
     )
 )
 
-(def element THP_HealthBlock(_currentBlocks:number, _regenBlocks:number, _teamColor:number="C_ALLY")
+(def element THP_HealthBlock(_blockWidth:number, _blockMargin:number, _currentBlocks:number, _regenBlocks:number, _teamColor:number="C_ALLY")
     (scope
         (var blockIndex:number = "$index + 1")
         (var isRegen:bool = "blockIndex <= _regenBlocks")
         (var isHealth:bool = "blockIndex <= _currentBlocks")
         (var color:number = "isRegen    ? 0x665c5c5c : 
                              isHealth   ? _teamColor
-                                        : C_DARK_33 "
+                                        : C_DARK_T "
         )
-        (var width:number = 5)
+        # (var width:number = 5)
         (var height:number = 20)
     )
     (style
         (bind height "height")
-        (bind width "width")
+        (bind width "_blockWidth")
         (bind backgroundColor "color")
-        (marginLeft = 1px)
-        (marginRight = 1px)
+        (bind marginLeft "_blockMargin")
+        (bind marginRight "_blockMargin")
         (pivotX = 50%)
         (pivotY = 50%)
     )
@@ -83,7 +151,7 @@
     (block
         (class $Fullsize)
         (style
-            (bind backgroundColor "0xffffffff")
+            (bind backgroundColor "isHealth ? _teamColor : 0xffffffff")
             (pivotX = 50%)
             (pivotY = 50%)
             (alpha = 0)
@@ -105,7 +173,7 @@
                 from    = {visualScaleX: 2.0, visualScaleY: 3.0, alpha:0.6}
                 to      = {visualScaleX: 1.0, visualScaleY: 1.0, alpha:0.0}
                 action  = "killAll"
-                easing  = "Easing.cubic_in"
+                # easing  = "Easing.cubic_in"
                 (bind enabled "isHealth")
                 (bind trigger "isHealth")
             )
@@ -113,14 +181,21 @@
     )
 )
 
-(def element THP_TeamHealthValue(_currentHP:number)
+(def element THP_TeamHealthText(_currentHP:number)
     (scope
         (var hpKilo:number = "ceil(_currentHP / 1000)") # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
         (var prefix:str = "_currentHP < THP_HP_PER_BLOCK ? '<' : ''")
         (var displayHP:str = "prefix + toString(hpKilo) + 'K' ")
     )
+    (style
+        (width = "THP_TEXT_WIDTH")
+    )
     (tf
         (class $TextDefaultBold18NM)
+        (style
+            (width = 100%)
+            (textAlign = "right")
+        )
         (bind text "displayHP")
     )
 )
