@@ -14,6 +14,8 @@ There are some noteworthy additions from the original project:
 There are 2 modes:
 - **Relative**: The length of the HP bar is **fixed**. It will use the specified number of blocks to indicate HP. The amount of HP per block varies by team.
 - **Absolute**: The length of the HP bar is **variable**. The amount of HP per block is consistent for both teams. Useful for tournament casters.
+![Relative](https://github.com/user-attachments/assets/a38641eb-cbb9-4043-bb16-f11ee8def1c7)
+![Absolute](https://github.com/user-attachments/assets/ee964fbd-80db-440d-b11d-e2b5404bf497)
 
 # Install
 1. Download a zip.
