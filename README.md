@@ -1,7 +1,8 @@
 # Team HP
 This mod shows the total HP of both teams.
 
-The mod was originally developed by AutoSpy.
+AutoSpy, who no longer plays World of Warships, developed the original concept of this mod.  
+My project is a complete rewrite from scratch, with bug fixes, support for WoWS, and more options.
 
 # Install
 1. Download a zip.
