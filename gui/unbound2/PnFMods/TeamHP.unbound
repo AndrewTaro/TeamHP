@@ -2,15 +2,23 @@
 
 (def constant THP_COMPONENT_KEY 'modTeamHP')
 (def constant THP_ELEMENT_NAME "'teamHP'")
-(def constant THP_HP_PER_BLOCK 25000)
-(def constant THP_BAR_WIDTH 200px)
 (def constant THP_TEXT_WIDTH 50px)
 (def constant THP_BLOCK_WIDTH 10px)
 
+(def constant THP_BLOCK_SIZE {
+	WIDTH   : 10px,
+	HEIGHT  : 20px,
+})
+
 (def constant THP_DISPLAY_MODES {
-	DISABLE: 0,
-	ENABLE: 1,
+	DISABLE : 0,
+	ENABLE  : 1,
 	ADAPTIVE: 2,
+})
+
+(def constant THP_HEALTH_TYPES {
+	RELATIVE: 0,
+	ABSOLUTE: 1,
 })
 
 (def element THP_TeamHP () layout=true
@@ -91,7 +99,8 @@
         )
         # Text
         (element THP_TeamHealthText
-            _currentHP  = "currentHP"
+            _currentHP    = "currentHP"
+            _userPrefsNum = "_userPrefsNum"
         )
     )
 )
@@ -100,20 +109,22 @@
     (scope
         (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
         (macro TT_GET_PREF_BOOL   _varName="'isReversed'"       _pref="revPref.REVERSE")
+        (macro TT_GET_PREF_NUMBER _varName="'heightMultiplier'" _pref="THP_PREFS.BLOCK_HEIGHT")
         (macro TT_GET_PREF_NUMBER _varName="'widthMultiplier'"  _pref="THP_PREFS.BLOCK_WIDTH")
         (macro TT_GET_PREF_NUMBER _varName="'blockMargin'"	    _pref="THP_PREFS.BLOCK_MARGIN")
         (macro TT_GET_PREF_NUMBER _varName="'blockCount'"	    _pref="THP_PREFS.BLOCK_COUNT")  # For Relative
         (macro TT_GET_PREF_NUMBER _varName="'healthPerBlock'"	_pref="THP_PREFS.BLOCK_HEALTH") # For Absolute
         (macro TT_GET_PREF_NUMBER _varName="'healthType'"	    _pref="THP_PREFS.HEALTH_TYPE")
 
-        (var isRelativeMode:bool = "healthType == 0")
+        (var isRelativeMode:bool = "healthType == THP_HEALTH_TYPES.RELATIVE")
         
         # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
         (var divisor:number = "isRelativeMode ? ceil(_maxHP / blockCount) : healthPerBlock")
         (var currentBlocks:number = "ceil(_currentHP / divisor)")
         (var maxBlocks:number = "isRelativeMode ? blockCount : ceil(_maxHP / divisor)")
         (var regenBlocks:number = "ceil(_maxRegen / divisor)")
-        (var blockWidth:number = "round(THP_BLOCK_WIDTH * widthMultiplier)")
+        (var blockWidth:number = "round(THP_BLOCK_SIZE.WIDTH * widthMultiplier)")
+        (var blockHeight:number = "round(THP_BLOCK_SIZE.HEIGHT * heightMultiplier)")
 
         (var teamColor:number = "_isAlly ? C_ALLY : C_ENEMY")
 
@@ -128,6 +139,7 @@
             (bind count "maxBlocks")
             (args
                 _blockWidth     = "blockWidth"
+                _blockHeight    = "blockHeight"
                 _blockMargin    = "blockMargin"
                 _currentBlocks  = "currentBlocks"
                 _regenBlocks    = "regenBlocks"
@@ -137,20 +149,18 @@
     )
 )
 
-(def element THP_HealthBlock(_blockWidth:number, _blockMargin:number, _currentBlocks:number, _regenBlocks:number, _teamColor:number="C_ALLY")
+(def element THP_HealthBlock(_blockWidth:number, _blockHeight:number, _blockMargin:number, _currentBlocks:number, _regenBlocks:number, _teamColor:number="C_ALLY")
     (scope
         (var blockIndex:number = "$index + 1")
         (var isRegen:bool = "blockIndex <= _regenBlocks")
         (var isHealth:bool = "blockIndex <= _currentBlocks")
-        (var color:number = "isRegen    ? 0x665c5c5c : 
-                             isHealth   ? _teamColor
+        (var color:number = "isHealth   ? _teamColor :
+                             isRegen    ? 0x665c5c5c
                                         : C_DARK_T "
         )
-        # (var width:number = 5)
-        (var height:number = 20)
     )
     (style
-        (bind height "height")
+        (bind height "_blockHeight")
         (bind width "_blockWidth")
         (bind backgroundColor "color")
         (bind marginLeft "_blockMargin")
@@ -193,11 +203,11 @@
     )
 )
 
-(def element THP_TeamHealthText(_currentHP:number)
+(def element THP_TeamHealthText(_currentHP:number, _userPrefsNum:gfx=null)
     (scope
-        (var hpKilo:number = "ceil(_currentHP / 1000)") # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
-        (var prefix:str = "_currentHP < THP_HP_PER_BLOCK ? '<' : ''")
-        (var displayHP:str = "prefix + toString(hpKilo) + 'K' ")
+        (var hpKilo:number = "_currentHP / 1000") # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
+        (var hpText:str = "hpKilo < 100 ? formatFloatingPoint(hpKilo) : ceil(hpKilo)")
+        (var displayHP:str = "hpText + 'K' ")
     )
     (style
         (width = "THP_TEXT_WIDTH")
