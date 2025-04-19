@@ -70,24 +70,26 @@ class TeamHP(object):
             # Health
             if healthComp and healthComp.max:
                 # Vehicles that are spotted at least once
-                maxValue     = healthComp.max
-                currentValue = healthComp.value
+                maxHealth       = healthComp.max
+                currentHealth   = healthComp.value
             else:
                 # Vehicles that have never been spotted
                 #
                 # From testing, it seems covnerting PlayeInfo object into API_v_1_0.dummy object is very costly and affects the performance badly
                 # Thus, calling `getPlayerInfo` every frame on every player is not recommended
                 # 
-                maxHealth = self._maxHealthMap.get(entity[CC.avatar].id, 0)
-                maxValue     = maxHealth
-                currentValue = maxHealth
-            
-            data[team]['maxHP'] += maxValue
-            data[team]['currentHP'] += currentValue
+                maxHealth       = self._maxHealthMap.get(entity[CC.avatar].id, 0)
+                currentHealth   = maxHealth
 
             # Regen
             if CC.dataComponent in entity:
-                data[team]['maxRegen'] += getattr(entity[CC.dataComponent].data, 'maxValue', 0)            
+                maxRegen = entity[CC.dataComponent].data.get('maxValue', currentHealth)
+            else:
+                maxRegen = currentHealth
+
+            data[team]['maxHP'] += maxHealth
+            data[team]['currentHP'] += currentHealth
+            data[team]['maxRegen'] += maxRegen
 
         self._entity.updateEntity(data)
 
