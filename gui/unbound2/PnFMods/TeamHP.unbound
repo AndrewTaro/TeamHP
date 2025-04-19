@@ -7,6 +7,12 @@
 (def constant THP_TEXT_WIDTH 50px)
 (def constant THP_BLOCK_WIDTH 10px)
 
+(def constant THP_DISPLAY_MODES {
+	DISABLE: 0,
+	ENABLE: 1,
+	ADAPTIVE: 2,
+})
+
 (def element THP_TeamHP () layout=true
     (scope
         (var entityWatcher:gfx = "$datahub.getPrimWatcher(CC.mods_DataComponent, THP_COMPONENT_KEY)")
@@ -15,7 +21,13 @@
 		(var healthData:dict = "dataComponent ? dataComponent.data : {}" (event "dataComponent.evDataChanged"))
 
         (macro TT_GET_USERPREF)
+        (macro TT_GET_PREF_NUMBER _varName="'displayMode'"	    _pref="THP_PREFS.DISPLAY_MODE")
+        (var cameraComponent:gfx = "$datahub.getSingleComponent(CC.camera)")
+	    (var altVision:bool = "cameraComponent ? cameraComponent.altVision : false" (event "cameraComponent.evAltVisionChanged"))
+        (var isVisible:bool = "displayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision : displayMode")
     )
+
+    (bind visible "isVisible")
 
     # Ally
     (element THP_TeamHealthItem _healthData="healthData" _isAlly=true   _userPrefsNum="_userPrefsNum")
@@ -39,7 +51,7 @@
         (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
 
         (macro STAGE_SIZE)
-        (var defaultX:number = "stageWidth / 2 + (_isAlly ? 100 : -100)")
+        (var defaultX:number = "stageWidth / 2 + (_isAlly ? -100 : 100)")
         (var defaultPos:dict = "{positionX: defaultX, positionY: 50}")
         (var elementName:str = "THP_ELEMENT_NAME + (_isAlly ? 'Ally' : 'Enemy')")
         (macro DRAGGABLE_GET_DROP_POSITION _wndName = "elementName" _defaults = "defaultPos")
