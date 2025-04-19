@@ -126,8 +126,6 @@
         (var blockWidth:number = "round(THP_BLOCK_SIZE.WIDTH * widthMultiplier)")
         (var blockHeight:number = "round(THP_BLOCK_SIZE.HEIGHT * heightMultiplier)")
 
-        (var teamColor:number = "_isAlly ? C_ALLY : C_ENEMY")
-
         (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
     )
 
@@ -143,19 +141,21 @@
                 _blockMargin    = "blockMargin"
                 _currentBlocks  = "currentBlocks"
                 _regenBlocks    = "regenBlocks"
-                _teamColor      = "teamColor"
+                _isAlly         = "_isAlly"
             )
         )
     )
 )
 
-(def element THP_HealthBlock(_blockWidth:number, _blockHeight:number, _blockMargin:number, _currentBlocks:number, _regenBlocks:number, _teamColor:number="C_ALLY")
+(def element THP_HealthBlock(_blockWidth:number, _blockHeight:number, _blockMargin:number, _currentBlocks:number, _regenBlocks:number, _isAlly:bool=true)
     (scope
         (var blockIndex:number = "$index + 1")
         (var isRegen:bool = "blockIndex <= _regenBlocks")
         (var isHealth:bool = "blockIndex <= _currentBlocks")
-        (var color:number = "isHealth   ? _teamColor :
-                             isRegen    ? 0x665c5c5c
+        (var teamColor:number = "_isAlly ? C_ALLY : C_ENEMY")
+        (var teamCT:dict = "_isAlly ? TWO_TEAMS_COLOR_TRANSFORMS['ally'] : TWO_TEAMS_COLOR_TRANSFORMS['enemy']")
+        (var color:number = "isHealth   ? teamColor :
+                             isRegen    ? 0xff999999
                                         : C_DARK_T "
         )
     )
@@ -169,11 +169,19 @@
         (pivotY = 50%)
     )
 
+    # Outline for Regen
+    (block
+        (class $FullsizeAbsolute)
+        (style (backgroundImage = 'url:../service_kit/frames/one_pixel_frame.png') (scale9grid = 2) (alpha = 1))
+        (bind colorTransform "teamCT")
+        (bind visible "isRegen || isHealth")
+    )
+
     # For animation
     (block
         (class $Fullsize)
         (style
-            (bind backgroundColor "isHealth ? _teamColor : 0xffffffff")
+            (bind backgroundColor "isHealth ? teamColor : 0xffffffff")
             (pivotX = 50%)
             (pivotY = 50%)
             (alpha = 0)
