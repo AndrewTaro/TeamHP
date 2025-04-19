@@ -1,6 +1,6 @@
 # Team HP
 This mod shows the total HP of both teams.
-![Team HP](https://github.com/user-attachments/assets/83dfa286-c484-41cb-9a6b-b31104197788)
+![image](https://github.com/user-attachments/assets/15ca2e36-b26b-4f6d-b1a7-c92d8ffce58d)
 
 AutoSpy, who no longer plays World of Warships, developed the original concept of this mod.  
 My project is a complete rewrite from scratch, with bug fixes and more options.
