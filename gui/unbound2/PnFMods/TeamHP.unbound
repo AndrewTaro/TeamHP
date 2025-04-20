@@ -16,6 +16,16 @@
 	ADAPTIVE: 2,
 })
 
+(def constant THP_STYLES {
+	HP_AND_BAR   : 0,
+	BAR_AND_HP   : 1,
+})
+
+(def constant THP_BAR_DIRECTIONS {
+	LEFT   : 0,
+	RIGHT  : 1,
+})
+
 (def constant THP_HEALTH_TYPES {
 	RELATIVE: 0,
 	ABSOLUTE: 1,
@@ -55,12 +65,16 @@
         (macro TT_GET_PREF_BOOL   _varName="'isPositionLocked'" 	_pref="THP_PREFS.DISABLE_DRAGDROP")
 
         (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
-        (macro TT_GET_PREF_BOOL   _varName="'isReversed'"       _pref="revPref.REVERSE")
+        (macro TT_GET_PREF_NUMBER _varName="'styleIndex'"       _pref="revPref.STYLE_INDEX")
+        (var isReversed:bool = "styleIndex == THP_STYLES.HP_AND_BAR")
         (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
+
+        (macro TT_GET_PREF_NUMBER _varName="'barDirection'"       _pref="revPref.BAR_DIRECTION")
+        (var isBarReversed:bool = "barDirection == THP_BAR_DIRECTIONS.LEFT")
 
         (macro STAGE_SIZE)
         (var defaultX:number = "stageWidth / 2 + (_isAlly ? -100 : 100)")
-        (var defaultPos:dict = "{positionX: defaultX, positionY: 50}")
+        (var defaultPos:dict = "{positionX: defaultX, positionY: 100}")
         (var elementName:str = "THP_ELEMENT_NAME + (_isAlly ? 'Ally' : 'Enemy')")
         (macro DRAGGABLE_GET_DROP_POSITION _wndName = "elementName" _defaults = "defaultPos")
     )
@@ -69,7 +83,7 @@
         (position = "absolute")
         (bind left "dragPosX")
         (bind top "dragPosY")
-        (bind pivotX "isReversed ? 100% : 0%")
+        (bind pivotX "isBarReversed ? 100% : 0%")
     )
 
     # Draggable
@@ -108,7 +122,7 @@
 (def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true, _userPrefsNum:gfx=null)
     (scope
         (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
-        (macro TT_GET_PREF_BOOL   _varName="'isReversed'"       _pref="revPref.REVERSE")
+        (macro TT_GET_PREF_NUMBER _varName="'barDirection'"     _pref="revPref.BAR_DIRECTION")
         (macro TT_GET_PREF_NUMBER _varName="'heightMultiplier'" _pref="THP_PREFS.BLOCK_HEIGHT")
         (macro TT_GET_PREF_NUMBER _varName="'widthMultiplier'"  _pref="THP_PREFS.BLOCK_WIDTH")
         (macro TT_GET_PREF_NUMBER _varName="'blockMargin'"	    _pref="THP_PREFS.BLOCK_MARGIN")
@@ -126,7 +140,8 @@
         (var blockWidth:number = "round(THP_BLOCK_SIZE.WIDTH * widthMultiplier)")
         (var blockHeight:number = "round(THP_BLOCK_SIZE.HEIGHT * heightMultiplier)")
 
-        (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
+        (var isBarReversed:bool = "barDirection == THP_BAR_DIRECTIONS.LEFT")
+        (var flowDir:number = "isBarReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
     )
 
     (hblock
@@ -153,7 +168,7 @@
         (var isRegen:bool = "blockIndex <= _regenBlocks")
         (var isHealth:bool = "blockIndex <= _currentBlocks")
         (var teamColor:number = "_isAlly ? C_ALLY : C_ENEMY")
-        (var teamCT:dict = "_isAlly ? TWO_TEAMS_COLOR_TRANSFORMS['ally'] : TWO_TEAMS_COLOR_TRANSFORMS['enemy']")
+        (var ctKey:str = "_isAlly ? 'ally' : 'enemy'")
         (var color:number = "isHealth   ? teamColor :
                              isRegen    ? 0xff999999
                                         : C_DARK_T "
@@ -173,7 +188,7 @@
     (block
         (class $FullsizeAbsolute)
         (style (backgroundImage = 'url:../service_kit/frames/one_pixel_frame.png') (scale9grid = 2) (alpha = 1))
-        (bind colorTransform "teamCT")
+        (bind colorTransform "TWO_TEAMS_COLOR_TRANSFORMS[ctKey]")
         (bind visible "isRegen || isHealth")
     )
 
