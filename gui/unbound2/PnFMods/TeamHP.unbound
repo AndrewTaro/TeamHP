@@ -39,13 +39,7 @@
 		(var healthData:dict = "dataComponent ? dataComponent.data : {}" (event "dataComponent.evDataChanged"))
 
         (macro TT_GET_USERPREF)
-        (macro TT_GET_PREF_NUMBER _varName="'displayMode'"	    _pref="THP_PREFS.DISPLAY_MODE")
-        (var cameraComponent:gfx = "$datahub.getSingleComponent(CC.camera)")
-	    (var altVision:bool = "cameraComponent ? cameraComponent.altVision : false" (event "cameraComponent.evAltVisionChanged"))
-        (var isVisible:bool = "displayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision : displayMode")
     )
-
-    (bind visible "isVisible")
 
     # Ally
     (element THP_TeamHealthItem _healthData="healthData" _isAlly=true   _userPrefsNum="_userPrefsNum")
@@ -72,6 +66,18 @@
         (macro TT_GET_PREF_NUMBER _varName="'barDirection'"       _pref="revPref.BAR_DIRECTION")
         (var isBarReversed:bool = "barDirection == THP_BAR_DIRECTIONS.LEFT")
 
+        (var cameraComponent:gfx = "$datahub.getSingleComponent(CC.camera)")
+	    (var altVision:bool = "cameraComponent ? cameraComponent.altVision : false" (event "cameraComponent.evAltVisionChanged"))
+
+        # BG
+        (macro TT_GET_PREF_NUMBER _varName="'bgAlpha'"          _pref="THP_PREFS.BACKGROUND.ALPHA")
+        (macro TT_GET_PREF_NUMBER _varName="'bgDisplayMode'"    _pref="THP_PREFS.BACKGROUND.DISPLAY_MODE")
+        (var isBGVisible:bool = "bgDisplayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision : bgDisplayMode")
+
+        # Main
+        (macro TT_GET_PREF_NUMBER _varName="'displayMode'"	    _pref="THP_PREFS.DISPLAY_MODE")
+        (var isVisible:bool = "displayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision : displayMode")
+
         (macro STAGE_SIZE)
         (var defaultX:number = "stageWidth / 2 + (_isAlly ? -100 : 100)")
         (var defaultPos:dict = "{positionX: defaultX, positionY: 100}")
@@ -86,12 +92,30 @@
         (bind pivotX "isBarReversed ? 100% : 0%")
     )
 
+    (bind visible "isVisible")
+
     # Draggable
     (controller $Instance renderer='ModDraggableElement'
         (bind enabled "!isPositionLocked")
         (args
             _wndName="elementName"
             _defaults = "defaultPos"
+        )
+    )
+
+    # BG
+    (block
+        (bind visible "isBGVisible")
+        (style
+            (hitTest = false)
+            (bind alpha "bgAlpha")
+        )
+        (class $FullsizeAbsolute)
+        (mc contrast_panel
+            (class $FullsizeAbsolute)
+        )
+        (mc hint_panel
+            (class $FullsizeAbsolute)
         )
     )
 
@@ -102,7 +126,9 @@
             (hitTest = false)
             (hgap = 5px)
             (bind flow "flowDir")
+            (padding = 2)
         )
+        
         # Bar
         (element THP_TeamHealthBar
             _currentHP  = "currentHP"
