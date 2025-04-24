@@ -2,7 +2,7 @@
 
 (def constant THP_COMPONENT_KEY 'modTeamHP')
 (def constant THP_ELEMENT_NAME "'teamHP'")
-(def constant THP_TEXT_WIDTH 50px)
+(def constant THP_TEXT_WIDTH 55px)
 (def constant THP_BLOCK_WIDTH 10px)
 
 (def constant THP_BLOCK_SIZE {
@@ -257,15 +257,22 @@
         (var hpKilo:number = "_currentHP / 1000") # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
         (var hpText:str = "hpKilo < 100 ? formatFloatingPoint(hpKilo) : ceil(hpKilo)")
         (var displayHP:str = "hpText + 'K' ")
+
+        (macro TT_GET_PREF_NUMBER _varName="'fontSize'"       _pref="THP_PREFS.FONT_SIZE")
     )
     (style
         (width = "THP_TEXT_WIDTH")
+        (align = "middle|center")
     )
     (tf
-        (class $TextDefaultBold18NM)
+        (class $TextDefaultBold)
+        (class $FontEnableReadability)
         (style
             (width = 100%)
-            (textAlign = "right")
+            (textAlign = "center")
+            (bind fontSize "fontSize")
+            (marginTextTop = -6px)
+	        (marginTextBottom = -5px)
         )
         (bind text "displayHP")
     )
