@@ -50,6 +50,8 @@
 
 (def element THP_TeamHealthItem(_healthData:dict, _isAlly:bool=true, _userPrefsNum:gfx=null)
     (scope
+        (event evAddedToStage)
+
         (var teamKey:str = "_isAlly ? 'ally' : 'enemy'")
         (var teamData:dict = "teamKey in _healthData ? _healthData[teamKey] : {}")
         (var maxHP:number = "'maxHP' in teamData ? teamData.maxHP : 0")
@@ -90,9 +92,21 @@
         (bind left "dragPosX")
         (bind top "dragPosY")
         (bind pivotX "isBarReversed ? 100% : 0%")
+        (alpha = 0)
     )
 
     (bind visible "isVisible")
+
+    (dispatch evAddedToStage args="{}" on=addedToStage)
+    (controller $Animation
+        (bindcall play 
+            from     = "{visualOffsetY: -10, alpha: 0}"
+            to       = "{visualOffsetY:   0, alpha: 1}"
+            delay    = "3"
+            duration = "0.3"
+            (event "evAddedToStage")
+        )
+    )
 
     # Draggable
     (controller $Instance renderer='ModDraggableElement'
