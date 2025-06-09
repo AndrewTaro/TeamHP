@@ -68,18 +68,20 @@ class TeamHP(object):
             healthComp = entity[CC.health]
             
             # Health
-            if healthComp and healthComp.max:
-                # Vehicles that are spotted at least once
-                maxHealth       = healthComp.max
-                currentHealth   = healthComp.value
-            else:
-                # Vehicles that have never been spotted
-                #
-                # From testing, it seems covnerting PlayeInfo object into API_v_1_0.dummy object is very costly and affects the performance badly
-                # Thus, calling `getPlayerInfo` every frame on every player is not recommended
-                # 
-                maxHealth       = self._maxHealthMap.get(entity[CC.avatar].id, 0)
-                currentHealth   = maxHealth
+            if not healthComp:
+                logError('Health component does not exist.', entity.id)
+
+
+            # Vehicle have comp until it is spotted.
+            # Even then, if it is spotted outside the rendering range, health.max and value remain at 0.
+            #
+            # From testing, it seems covnerting PlayeInfo object into API_v_1_0.dummy object is very costly and affects the performance badly
+            # Thus, calling `getPlayerInfo` every frame on every player is not recommended
+            # 
+            maxHealth       = healthComp.max if healthComp.max else self._maxHealthMap.get(entity[CC.avatar].id, 0)
+
+            isAlive = healthComp.isAlive
+            currentHealth = healthComp.value if healthComp.value else maxHealth
 
             # Regen
             if CC.dataComponent in entity:
@@ -88,8 +90,8 @@ class TeamHP(object):
                 maxRegen = currentHealth
 
             data[team]['maxHP'] += maxHealth
-            data[team]['currentHP'] += currentHealth
-            data[team]['maxRegen'] += maxRegen
+            data[team]['currentHP'] += currentHealth * isAlive
+            data[team]['maxRegen'] += maxRegen * isAlive
 
         self._entity.updateEntity(data)
 
