@@ -69,8 +69,8 @@ class TeamHP(object):
             
             # Health
             if not healthComp:
-                logError('Health component does not exist.', entity.id)
-
+                logError('Health component does not exist.', entity.id, entity[CC.avatar].name, entity[CC.avtar].id)
+                continue
 
             # Vehicle have comp until it is spotted.
             # Even then, if it is spotted outside the rendering range, health.max and value remain at 0.
