@@ -39,11 +39,7 @@
 		(var healthData:dict = "dataComponent ? dataComponent.data : {}" (event "dataComponent.evDataChanged"))
 
         (macro TT_GET_USERPREF)
-
-        (macro IS_SPECTATOR_MODE)
     )
-
-    (bind visible "!isSpectatorTrainingMode")
 
     # Ally
     (element THP_TeamHealthItem _healthData="healthData" _isAlly=true   _userPrefsNum="_userPrefsNum")
