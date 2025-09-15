@@ -78,7 +78,10 @@
 
         # Main
         (macro TT_GET_PREF_NUMBER _varName="'displayMode'"	    _pref="THP_PREFS.DISPLAY_MODE")
-        (var isVisible:bool = "displayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision : displayMode")
+        (var isVisible:bool = "maxHP ? displayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision
+                                                                                 : displayMode
+                                     : false
+        ")
 
         (macro STAGE_SIZE)
         (var defaultX:number = "stageWidth / 2 + (_isAlly ? -100 : 100)")
@@ -173,7 +176,9 @@
         (var isRelativeMode:bool = "healthType == THP_HEALTH_TYPES.RELATIVE")
         
         # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
-        (var divisor:number = "isRelativeMode ? ceil(_maxHP / blockCount) : healthPerBlock")
+        (var divisor:number = "isRelativeMode ? _maxHP  ? ceil(_maxHP / blockCount)
+                                                        : -1
+                                              : healthPerBlock")
         (var currentBlocks:number = "ceil(_currentHP / divisor)")
         (var maxBlocks:number = "isRelativeMode ? blockCount : ceil(_maxHP / divisor)")
         (var regenBlocks:number = "ceil(_maxRegen / divisor)")
@@ -189,6 +194,7 @@
             (bind flow "flowDir")
         )
         (controller $Repeat renderer='THP_HealthBlock'
+            (bind enabled "maxBlocks > 0")
             (bind count "maxBlocks")
             (args
                 _blockWidth     = "blockWidth"
