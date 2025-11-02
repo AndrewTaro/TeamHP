@@ -69,7 +69,7 @@ class TeamHP(object):
             
             # Health
             if not healthComp:
-                logError('Health component does not exist.', entity.id, entity[CC.avatar].name, entity[CC.avtar].id)
+                logError('Health component does not exist.', entity.id, entity[CC.avatar].name, entity[CC.avatar].id)
                 continue
 
             # Vehicle have comp until it is spotted.
