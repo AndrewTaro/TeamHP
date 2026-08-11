@@ -1,7 +1,7 @@
-(def constant TT_TEAMHP_INSTALLED "true")
-
+# Install gating comes from modPrefs.installedMods (Python-scanned), so a consumer no longer advertises
+# itself with a TT_<MOD>_INSTALLED constant.  There is no element-name constant either: that string was
+# the legacy chatBoxWidth position prefix, and Python owns positions + resKey now.
 (def constant THP_COMPONENT_KEY 'modTeamHP')
-(def constant THP_ELEMENT_NAME "'teamHP'")
 (def constant THP_TEXT_WIDTH 55px)
 (def constant THP_BLOCK_WIDTH 10px)
 
@@ -10,12 +10,8 @@
 	HEIGHT  : 20px,
 })
 
-(def constant THP_DISPLAY_MODES {
-	DISABLE : 0,
-	ENABLE  : 1,
-	ADAPTIVE: 2,
-})
-
+# The off/on/alt-vision triple is shared as TT_CONST.DISPLAY_MODE {DISABLED,ENABLED,ADAPTIVE}
+# (TTaroModConfigSharedConstants.unbound) -- never re-declare a per-mod copy of it.
 (def constant THP_STYLES {
 	HP_AND_BAR   : 0,
 	BAR_AND_HP   : 1,
@@ -37,18 +33,16 @@
 		(var armamentEntity:gfx = "entityWatcher.entity" (event "entityWatcher.event"))
 		(var dataComponent:gfx = "armamentEntity ? armamentEntity.mods_DataComponent : null")
 		(var healthData:dict = "dataComponent ? dataComponent.data : {}" (event "dataComponent.evDataChanged"))
-
-        (macro TT_GET_USERPREF)
     )
 
     # Ally
-    (element THP_TeamHealthItem _healthData="healthData" _isAlly=true   _userPrefsNum="_userPrefsNum")
+    (element THP_TeamHealthItem _healthData="healthData" _isAlly=true)
 
     # Enemy
-    (element THP_TeamHealthItem _healthData="healthData" _isAlly=false  _userPrefsNum="_userPrefsNum")  
+    (element THP_TeamHealthItem _healthData="healthData" _isAlly=false)
 )
 
-(def element THP_TeamHealthItem(_healthData:dict, _isAlly:bool=true, _userPrefsNum:gfx=null)
+(def element THP_TeamHealthItem(_healthData:dict, _isAlly:bool=true)
     (scope
         (event evAddedToStage)
 
@@ -58,42 +52,54 @@
         (var currentHP:number = "'currentHP' in teamData ? teamData.currentHP : 0")
         (var maxRegen:number = "'maxRegen' in teamData ? teamData.maxRegen : 0")
 
-        (macro TT_GET_PREF_BOOL   _varName="'isPositionLocked'" 	_pref="THP_PREFS.DISABLE_DRAGDROP")
+        (macro TT_GET_PREF _varName="'lockPref'" _key="'teamHP.disableDragdrop'")
+        (var isPositionLocked:bool = "null != lockPref && null != lockPref.value ? lockPref.value : false")
 
-        (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
-        (macro TT_GET_PREF_NUMBER _varName="'styleIndex'"       _pref="revPref.STYLE_INDEX")
+        # Per-team key PREFIX, built at runtime -- ally and enemy are two independent subtrees of the
+        # schema, so the dotted key is composed at each call site (`revPref + '.styleIndex'`);
+        # TT_GET_PREF's _key takes the built expression.  The draggables hang off the same prefix as
+        # `<prefix>.position` -- a position key is never the prefix itself, or its opaque bucket map
+        # would share a node with the siblings here and eat them (see the framework's BUILD_STATE #2).
+        (var revPref:str = "_isAlly ? 'teamHP.ally' : 'teamHP.enemy'")
+
+        # Ally and enemy carry DIFFERENT schema defaults for both dropdowns, so the pre-publish
+        # fallback is per-team too.
+        (macro TT_GET_PREF _varName="'stylePref'" _key="revPref + '.styleIndex'")
+        (var styleIndex:number = "null != stylePref && null != stylePref.value ? stylePref.value : _isAlly ? THP_STYLES.HP_AND_BAR : THP_STYLES.BAR_AND_HP")
         (var isReversed:bool = "styleIndex == THP_STYLES.HP_AND_BAR")
         (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
 
-        (macro TT_GET_PREF_NUMBER _varName="'barDirection'"       _pref="revPref.BAR_DIRECTION")
+        (macro TT_GET_PREF _varName="'barDirPref'" _key="revPref + '.barDirection'")
+        (var barDirection:number = "null != barDirPref && null != barDirPref.value ? barDirPref.value : _isAlly ? THP_BAR_DIRECTIONS.LEFT : THP_BAR_DIRECTIONS.RIGHT")
         (var isBarReversed:bool = "barDirection == THP_BAR_DIRECTIONS.LEFT")
 
         (var cameraComponent:gfx = "$datahub.getSingleComponent(CC.camera)")
 	    (var altVision:bool = "cameraComponent ? cameraComponent.altVision : false" (event "cameraComponent.evAltVisionChanged"))
 
         # BG
-        (macro TT_GET_PREF_NUMBER _varName="'bgAlpha'"          _pref="THP_PREFS.BACKGROUND.ALPHA")
-        (macro TT_GET_PREF_NUMBER _varName="'bgDisplayMode'"    _pref="THP_PREFS.BACKGROUND.DISPLAY_MODE")
-        (var isBGVisible:bool = "bgDisplayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision : bgDisplayMode")
+        (macro TT_GET_PREF _varName="'bgAlphaPref'" _key="'teamHP.background.alpha'")
+        (var bgAlpha:number = "null != bgAlphaPref && null != bgAlphaPref.value ? bgAlphaPref.value : 0.4")
+        (macro TT_GET_PREF _varName="'bgModePref'" _key="'teamHP.background.displayMode'")
+        (var bgDisplayMode:number = "null != bgModePref && null != bgModePref.value ? bgModePref.value : TT_CONST.DISPLAY_MODE.DISABLED")
+        (var isBGVisible:bool = "bgDisplayMode == TT_CONST.DISPLAY_MODE.ADAPTIVE ? altVision : bgDisplayMode")
 
         # Main
-        (macro TT_GET_PREF_NUMBER _varName="'displayMode'"	    _pref="THP_PREFS.DISPLAY_MODE")
-        (var isVisible:bool = "maxHP ? displayMode == THP_DISPLAY_MODES.ADAPTIVE ? altVision
-                                                                                 : displayMode
+        (macro TT_GET_PREF _varName="'displayModePref'" _key="'teamHP.displayMode'")
+        (var displayMode:number = "null != displayModePref && null != displayModePref.value ? displayModePref.value : TT_CONST.DISPLAY_MODE.ENABLED")
+        (var isVisible:bool = "maxHP ? displayMode == TT_CONST.DISPLAY_MODE.ADAPTIVE ? altVision
+                                                                                    : displayMode
                                      : false
         ")
 
-        (macro STAGE_SIZE)
-        (var defaultX:number = "stageWidth / 2 + (_isAlly ? -100 : 100)")
-        (var defaultPos:dict = "{positionX: defaultX, positionY: 100}")
-        (var elementName:str = "THP_ELEMENT_NAME + (_isAlly ? 'Ally' : 'Enemy')")
-        (macro DRAGGABLE_GET_DROP_POSITION _elementName = "elementName" _defaultPosition = "defaultPos")
+        # Python owns the position value, the resKey bucket AND the first-placement default
+        # (CMS-authored anchor/offset), so there is no view-side default or stage math here.
+        (macro TT_DRAGGABLE_POSITION _fullKey="revPref + '.position'")
     )
 
     (style
         (position = "absolute")
-        (bind left "dragPosX")
-        (bind top "dragPosY")
+        (bind left "dragX")
+        (bind top "dragY")
         (bind pivotX "isBarReversed ? 100% : 0%")
         (alpha = 0)
     )
@@ -111,13 +117,15 @@
         )
     )
 
-    # Draggable
-    (controller $Instance renderer='ModDraggableElement'
-        (bind enabled "!isPositionLocked")
-        (args
-            _elementName="elementName"
-            _defaultPosition = "defaultPos"
-        )
+    # Full-size transparent drag surface.  MUST stay declared BEFORE the BG/content blocks below --
+    # that document order is what keeps TT_DRAGGABLE's signifier behind them (zindex does not cross a
+    # block boundary).  hitTest follows the lock: the macro gates the drag writes and the signifier,
+    # but only dropping hitTest here also suppresses the drag-hint tooltip.
+    (block
+        (class $FullsizeAbsolute)
+        (style (backgroundColor = 0x00FFFFFF))
+        (bind hitTest "!isPositionLocked")
+        (macro TT_DRAGGABLE _fullKey="revPref + '.position'" _isDragEnabled="!isPositionLocked")
     )
 
     # BG
@@ -152,26 +160,35 @@
             _maxHP      = "maxHP"
             _maxRegen   = "maxRegen"
             _isAlly     = "_isAlly"
-            _userPrefsNum = "_userPrefsNum"
         )
         # Text
         (element THP_TeamHealthText
             _currentHP    = "currentHP"
-            _userPrefsNum = "_userPrefsNum"
         )
     )
 )
 
-(def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true, _userPrefsNum:gfx=null)
+(def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true)
     (scope
-        (var revPref:dict = "_isAlly ? THP_PREFS.ALLY : THP_PREFS.ENEMY")
-        (macro TT_GET_PREF_NUMBER _varName="'barDirection'"     _pref="revPref.BAR_DIRECTION")
-        (macro TT_GET_PREF_NUMBER _varName="'heightMultiplier'" _pref="THP_PREFS.BLOCK_HEIGHT")
-        (macro TT_GET_PREF_NUMBER _varName="'widthMultiplier'"  _pref="THP_PREFS.BLOCK_WIDTH")
-        (macro TT_GET_PREF_NUMBER _varName="'blockMargin'"	    _pref="THP_PREFS.BLOCK_MARGIN")
-        (macro TT_GET_PREF_NUMBER _varName="'blockCount'"	    _pref="THP_PREFS.BLOCK_COUNT")  # For Relative
-        (macro TT_GET_PREF_NUMBER _varName="'healthPerBlock'"	_pref="THP_PREFS.BLOCK_HEALTH") # For Absolute
-        (macro TT_GET_PREF_NUMBER _varName="'healthType'"	    _pref="THP_PREFS.HEALTH_TYPE")
+        (var revPref:str = "_isAlly ? 'teamHP.ally' : 'teamHP.enemy'")
+        (macro TT_GET_PREF _varName="'barDirPref'" _key="revPref + '.barDirection'")
+        (var barDirection:number = "null != barDirPref && null != barDirPref.value ? barDirPref.value : _isAlly ? THP_BAR_DIRECTIONS.LEFT : THP_BAR_DIRECTIONS.RIGHT")
+
+        (macro TT_GET_PREF _varName="'blockHeightPref'" _key="'teamHP.style.blockHeight'")
+        (var heightMultiplier:number = "null != blockHeightPref && null != blockHeightPref.value ? blockHeightPref.value : 1")
+        (macro TT_GET_PREF _varName="'blockWidthPref'" _key="'teamHP.style.blockWidth'")
+        (var widthMultiplier:number = "null != blockWidthPref && null != blockWidthPref.value ? blockWidthPref.value : 1")
+        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'teamHP.style.blockMargin'")
+        (var blockMargin:number = "null != blockMarginPref && null != blockMarginPref.value ? blockMarginPref.value : 1")
+
+        # blockCount drives RELATIVE mode, healthPerBlock ABSOLUTE -- healthType picks which; the other
+        # setting is greyed in the config panel but still reads its stored value here.
+        (macro TT_GET_PREF _varName="'blockCountPref'" _key="'teamHP.style.blockCount'")
+        (var blockCount:number = "null != blockCountPref && null != blockCountPref.value ? blockCountPref.value : 20")
+        (macro TT_GET_PREF _varName="'blockHealthPref'" _key="'teamHP.style.blockHealth'")
+        (var healthPerBlock:number = "null != blockHealthPref && null != blockHealthPref.value ? blockHealthPref.value : 30000")
+        (macro TT_GET_PREF _varName="'healthTypePref'" _key="'teamHP.healthType'")
+        (var healthType:number = "null != healthTypePref && null != healthTypePref.value ? healthTypePref.value : THP_HEALTH_TYPES.RELATIVE")
 
         (var isRelativeMode:bool = "healthType == THP_HEALTH_TYPES.RELATIVE")
         
@@ -272,13 +289,14 @@
     )
 )
 
-(def element THP_TeamHealthText(_currentHP:number, _userPrefsNum:gfx=null)
+(def element THP_TeamHealthText(_currentHP:number)
     (scope
         (var hpKilo:number = "_currentHP / 1000") # Use ceil so that tiney HP like 100 can still be displayed as non-zero value
         (var hpText:str = "hpKilo < 100 ? formatFloatingPoint(hpKilo) : ceil(hpKilo)")
         (var displayHP:str = "hpText + 'K' ")
 
-        (macro TT_GET_PREF_NUMBER _varName="'fontSize'"       _pref="THP_PREFS.FONT_SIZE")
+        (macro TT_GET_PREF _varName="'fontSizePref'" _key="'teamHP.style.fontSize'")
+        (var fontSize:number = "null != fontSizePref && null != fontSizePref.value ? fontSizePref.value : 18")
     )
     (style
         (width = "THP_TEXT_WIDTH")
