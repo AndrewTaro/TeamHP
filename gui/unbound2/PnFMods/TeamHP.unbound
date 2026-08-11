@@ -123,8 +123,12 @@
     # but only dropping hitTest here also suppresses the drag-hint tooltip.
     (block
         (class $FullsizeAbsolute)
-        (style (backgroundColor = 0x00FFFFFF))
-        (bind hitTest "!isPositionLocked")
+        # hitTest is a STYLE property: bound at element level it resolves against the backing
+        # UbSprite and throws "access of undefined method 'hitTest'".  It must sit inside (style).
+        (style
+            (backgroundColor = 0x00FFFFFF)
+            (bind hitTest "!isPositionLocked")
+        )
         (macro TT_DRAGGABLE _fullKey="revPref + '.position'" _isDragEnabled="!isPositionLocked")
     )
 
