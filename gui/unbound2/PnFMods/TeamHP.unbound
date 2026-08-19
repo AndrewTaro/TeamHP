@@ -3,12 +3,6 @@
 # the legacy chatBoxWidth position prefix, and Python owns positions + resKey now.
 (def constant THP_COMPONENT_KEY 'modTeamHP')
 (def constant THP_TEXT_WIDTH 55px)
-(def constant THP_BLOCK_WIDTH 10px)
-
-(def constant THP_BLOCK_SIZE {
-	WIDTH   : 10px,
-	HEIGHT  : 20px,
-})
 
 # The off/on/alt-vision triple is shared as TT_CONST.DISPLAY_MODE {DISABLED,ENABLED,ADAPTIVE}
 # (TTaroModConfigSharedConstants.unbound) -- never re-declare a per-mod copy of it.
@@ -178,18 +172,18 @@
         (macro TT_GET_PREF _varName="'barDirPref'" _key="revPref + '.barDirection'")
         (var barDirection:number = "null != barDirPref && null != barDirPref.value ? barDirPref.value : _isAlly ? THP_BAR_DIRECTIONS.LEFT : THP_BAR_DIRECTIONS.RIGHT")
 
-        (macro TT_GET_PREF _varName="'blockHeightPref'" _key="'teamHP.style.blockHeight'")
-        (var heightMultiplier:number = "null != blockHeightPref && null != blockHeightPref.value ? blockHeightPref.value : 1")
-        (macro TT_GET_PREF _varName="'blockWidthPref'" _key="'teamHP.style.blockWidth'")
-        (var widthMultiplier:number = "null != blockWidthPref && null != blockWidthPref.value ? blockWidthPref.value : 1")
-        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'teamHP.style.blockMargin'")
+        (macro TT_GET_PREF _varName="'blockHeightPref'" _key="'teamHP.style.block.height'")
+        (var blockHeight:number = "blockHeightPref.value")
+        (macro TT_GET_PREF _varName="'blockWidthPref'" _key="'teamHP.style.block.width'")
+        (var blockWidth:number = "blockWidthPref.value")
+        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'teamHP.style.block.margin'")
         (var blockMargin:number = "null != blockMarginPref && null != blockMarginPref.value ? blockMarginPref.value : 1")
 
         # blockCount drives RELATIVE mode, healthPerBlock ABSOLUTE -- healthType picks which; the other
         # setting is greyed in the config panel but still reads its stored value here.
-        (macro TT_GET_PREF _varName="'blockCountPref'" _key="'teamHP.style.blockCount'")
+        (macro TT_GET_PREF _varName="'blockCountPref'" _key="'teamHP.style.block.count'")
         (var blockCount:number = "null != blockCountPref && null != blockCountPref.value ? blockCountPref.value : 20")
-        (macro TT_GET_PREF _varName="'blockHealthPref'" _key="'teamHP.style.blockHealth'")
+        (macro TT_GET_PREF _varName="'blockHealthPref'" _key="'teamHP.style.block.health'")
         (var healthPerBlock:number = "null != blockHealthPref && null != blockHealthPref.value ? blockHealthPref.value : 30000")
         (macro TT_GET_PREF _varName="'healthTypePref'" _key="'teamHP.healthType'")
         (var healthType:number = "null != healthTypePref && null != healthTypePref.value ? healthTypePref.value : THP_HEALTH_TYPES.RELATIVE")
@@ -203,8 +197,6 @@
         (var currentBlocks:number = "ceil(_currentHP / divisor)")
         (var maxBlocks:number = "isRelativeMode ? blockCount : ceil(_maxHP / divisor)")
         (var regenBlocks:number = "ceil(_maxRegen / divisor)")
-        (var blockWidth:number = "round(THP_BLOCK_SIZE.WIDTH * widthMultiplier)")
-        (var blockHeight:number = "round(THP_BLOCK_SIZE.HEIGHT * heightMultiplier)")
 
         (var isBarReversed:bool = "barDirection == THP_BAR_DIRECTIONS.LEFT")
         (var flowDir:number = "isBarReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
