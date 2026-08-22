@@ -14,7 +14,7 @@ REGEN_KEY_PREFIX = 'modRegenMonitor_'
 
 # CC.health polls at 20 Hz (high UI quality) / 5 Hz (low), so reading faster than this
 # cannot see more.
-_TICK_PERIOD = 0.05
+TICK_PERIOD = 0.05
 
 
 def logInfo(*args):
@@ -71,62 +71,73 @@ def _mk():
         return None
 
 
+# Resolved once, at load.  There is no retry: without it nothing here can run.
 _CTX = _mk()
 
 
 class TeamHP(object):
     def __init__(self):
         self._entityId = None
-        self._records = {}      # avatarId -> {'maxHealth': int, 'regen': component|None}
+        self._playerRecords = {}    # avatarId -> {'maxHealth': int, 'regen': comp|None}
         self._lastTotals = None
         self._timer = None
         events.onBattleShown(self.init)
         events.onBattleEnd(self.kill)
-        events.onPlayersListUpdated(self._refresh)
+        events.onPlayersListUpdated(self._updatePlayerRecords)
 
     # -------------------------------------------------------------- lifecycle
     def init(self, *args):
-        if self._collection(CC.avatar) is None:
+        if self._getCollection(CC.avatar) is None:
             logError('no collection reach; publishing nothing')
             return
         self._createEntity()
-        self._refresh()
+        self._updatePlayerRecords()
         self._startTick()
         logInfo('Initialized')
 
     def kill(self, *args):
         self._stopTick()
-        self._records.clear()
+        self._playerRecords.clear()
         self._removeEntity()
         logInfo('Killed')
 
-    def _refresh(self, *args):
+    # ----------------------------------------------------------- the records
+    def _updatePlayerRecords(self, *args):
         # PlayerInfo is the only maxHealth source while a ship still holds the stub 0 it
         # is created with, and converting one was measured costly, so it is read on the
-        # roster event only.  The regen record rides along: RegenMonitor creates it with
-        # the avatar, and this is the point where a re-added avatar's is picked up again.
+        # roster event only.  Updated in place: 'regen' resolves lazily and must survive.
         try:
             players = battle.getPlayersInfo()
         except:
             return
-        records = {}
+        records = self._playerRecords
         for avatarId, player in players.iteritems():
-            records[avatarId] = {'maxHealth': player.maxHealth,
-                                 'regen': self._regen(avatarId)}
-        self._records = records
+            record = records.get(avatarId)
+            if record is None:
+                records[avatarId] = {'maxHealth': player.maxHealth}
+            else:
+                record['maxHealth'] = player.maxHealth
 
-    def _regen(self, avatarId):
+    def _getRegen(self, record, avatarId):
+        # Key presence, not a None test -- None is a real answer.  RegenMonitor is an
+        # optional install, so retrying a miss would poll the index for every ship, every
+        # tick, for the whole battle.
+        if 'regen' not in record:
+            record['regen'] = self._getRegenComponent(avatarId)
+        return record['regen']
+
+    def _getRegenComponent(self, avatarId):
         if _CTX is None:
             return None
         try:
-            e = getattr(_CTX, _N[4])(REGEN_KEY_PREFIX + str(avatarId), CC.mods_DataComponent)
-            return e.mods_DataComponent if e is not None else None
+            entity = getattr(_CTX, _N[4])(REGEN_KEY_PREFIX + str(avatarId), CC.mods_DataComponent)
+            return entity.mods_DataComponent if entity is not None else None
         except:
             return None
 
-    def _collection(self, componentId):
-        # The gate's getEntityCollections rebuilds a wrapper per entity per call.  This
-        # is the real collection, and it is the exact set of players -- the health one
+    def _getCollection(self, componentId):
+        # The gate's getEntityCollections rebuilds a wrapper per entity per call.  This is
+        # the real collection, and CC.avatar is the exact set of players -- the health one
         # also holds squadrons, whose health.max is a plane count.
         if _CTX is None:
             return None
@@ -136,7 +147,7 @@ class TeamHP(object):
             return None
 
     # ------------------------------------------------------- our own DH entity
-    def _emptyData(self):
+    def _createDataDict(self):
         return {'ally': {'maxHP': 0, 'currentHP': 0, 'maxRegen': 0},
                 'enemy': {'maxHP': 0, 'currentHP': 0, 'maxRegen': 0}}
 
@@ -144,7 +155,7 @@ class TeamHP(object):
         if self._entityId is not None:
             self._removeEntity()
         self._entityId = ui.createUiElement()
-        ui.addDataComponentWithId(self._entityId, COMPONENT_KEY, self._emptyData())
+        ui.addDataComponentWithId(self._entityId, COMPONENT_KEY, self._createDataDict())
         self._lastTotals = None
 
     def _removeEntity(self):
@@ -160,7 +171,7 @@ class TeamHP(object):
     def _startTick(self):
         # callbacks.callback REPEATS: arm once, cancel in kill().
         self._stopTick()
-        self._timer = callbacks.callback(_TICK_PERIOD, self._tick)
+        self._timer = callbacks.callback(TICK_PERIOD, self.onTick)
 
     def _stopTick(self):
         handle = self._timer
@@ -172,13 +183,13 @@ class TeamHP(object):
         except:
             pass
 
-    def _tick(self, *args):
-        avatars = self._collection(CC.avatar)
+    def onTick(self, *args):
+        avatars = self._getCollection(CC.avatar)
         if avatars is None or self._entityId is None:
             return
-        totals = self._totals(avatars)
-        # Most ticks land on an unchanged total, so this is what keeps an idle battle
-        # from publishing.
+        totals = self._calcTeamTotals(avatars)
+        # Most ticks land on an unchanged total, so this is what keeps an idle battle from
+        # publishing.
         if totals == self._lastTotals:
             return
         self._lastTotals = totals
@@ -187,24 +198,25 @@ class TeamHP(object):
             'ally': {'maxHP': allyMax, 'currentHP': allyCur, 'maxRegen': allyRegen},
             'enemy': {'maxHP': enemyMax, 'currentHP': enemyCur, 'maxRegen': enemyRegen}})
 
-    def _totals(self, avatars):
+    def _calcTeamTotals(self, avatars):
         allyMax = allyCur = allyRegen = 0
         enemyMax = enemyCur = enemyRegen = 0
         allyRelations = ALLY_RELATIONS
-        records = self._records
+        records = self._playerRecords
         for entity in avatars:
             if not entity.has(CC.health):
                 # Health can lag the avatar; the next tick picks the ship up.
                 continue
             health = entity.health
-            record = records.get(entity.avatar.id)
+            avatarId = entity.avatar.id
+            record = records.get(avatarId)
             # An unspotted ship holds the stub, so read it as untouched.
             maxHealth = health.max or (record['maxHealth'] if record else 0)
             relation = entity.relation if entity.has(CC.relation) else None
             isAlly = relation is not None and relation.value in allyRelations
             if health.isAlive:
                 current = health.value or maxHealth
-                regen = record['regen'] if record else None
+                regen = self._getRegen(record, avatarId) if record else None
                 data = regen.data if regen is not None else None
                 # 0 is RegenMonitor's "no figure": no repair party, or none computed yet.
                 maxRegen = (data.get('maxValue') or current) if data else current
