@@ -16,8 +16,11 @@ REGEN_KEY_PREFIX = 'modRegenMonitor_'
 # so nothing upstream of us moves faster than this.  A per-frame flush would spend most of its
 # wake-ups re-publishing numbers that cannot have changed.
 _FLUSH_PERIOD = 0.05
-# RegenMonitor writes a ship's record on that ship's first publish, which can land after the
-# roster event that registered it here.  This retries the ones still missing a record.
+# RegenMonitor creates a ship's record on that ship's first health CHANGE, and only for a
+# rendered ship on your team that owns a repair party (in observer mode, either team).  So a
+# missing record is the normal steady state for most of the roster, and the one that appears
+# mid-battle does so at the moment of first damage -- this has to keep retrying all battle, not
+# just catch startup stragglers.
 _PROBE_PERIOD = 1.0
 
 
