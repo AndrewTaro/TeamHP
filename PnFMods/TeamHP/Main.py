@@ -12,8 +12,9 @@ ALLY_RELATIONS = (constants.PlayerRelation.SELF, constants.PlayerRelation.ALLY)
 COMPONENT_KEY = 'modTeamHP'
 REGEN_KEY_PREFIX = 'modRegenMonitor_'
 
-# CC.health polls at 20 Hz (high UI quality) / 5 Hz (low).  Nothing upstream is faster.
-_FLUSH_PERIOD = 0.05
+# CC.health polls at 20 Hz (high UI quality) / 5 Hz (low), so reading faster than this
+# cannot see more.
+_TICK_PERIOD = 0.05
 
 
 def logInfo(*args):
@@ -74,8 +75,8 @@ _CTX = _mk()
 
 
 class _Ship(object):
-    # Read once per ship per flush.
-    __slots__ = ('avatarId', 'health', 'relation', 'regen', 'maxFallback', 'subs')
+    # Resolved once per ship; the tick reads it, so keep it a slot lookup.
+    __slots__ = ('avatarId', 'health', 'relation', 'regen', 'maxFallback')
 
     def __init__(self, avatarId, healthComp, relationComp, maxFallback):
         self.avatarId = avatarId
@@ -83,7 +84,6 @@ class _Ship(object):
         self.relation = relationComp
         self.regen = None
         self.maxFallback = maxFallback
-        self.subs = []
 
 
 class TeamHP(object):
@@ -91,12 +91,9 @@ class TeamHP(object):
         self._entityId = None
         self._maxHealthMap = {}
         self._ships = {}        # game avatar entity -> _Ship
-        self._dirty = False
         self._lastTotals = None
-        self._flushTimer = None
+        self._timer = None
         self._hooks = []
-        # One stored bound method, so removal cannot depend on bound-method equality.
-        self._markRef = self._mark
         events.onBattleShown(self.init)
         events.onBattleEnd(self.kill)
         events.onPlayersListUpdated(self.onRosterChanged)
@@ -117,19 +114,18 @@ class TeamHP(object):
             ev.add(handler)
         for entity in healths:
             self._register(entity)
-        self._startFlush()
+        self._startTick()
         logInfo('Initialized')
 
     def kill(self, *args):
-        self._stopFlush()
+        self._stopTick()
         for ev, handler in self._hooks:
             try:
                 ev.remove(handler)
             except:
                 pass
         del self._hooks[:]
-        for entity in list(self._ships):
-            self._unregister(entity)
+        self._ships.clear()
         self._maxHealthMap.clear()
         self._removeEntity()
         logInfo('Killed')
@@ -146,7 +142,6 @@ class TeamHP(object):
             return
         for ship in self._ships.itervalues():
             ship.maxFallback = self._maxHealthMap.get(ship.avatarId, 0)
-        self._dirty = True
 
     # ------------------------------------------------------- our own DH entity
     def _emptyData(self):
@@ -169,7 +164,7 @@ class TeamHP(object):
         self._entityId = None
         self._lastTotals = None
 
-    # ------------------------------------------------ per-ship subscriptions
+    # ------------------------------------------------------- the ship cache
     def _collection(self, componentId):
         # The gate's getEntityCollections rebuilds a wrapper per entity per call and has
         # no add/remove event.  The real collection has both.
@@ -191,41 +186,16 @@ class TeamHP(object):
         if entity in self._ships or not entity.has(CC.avatar):
             return
         avatarId = entity.avatar.id
-        # Values are stubbed until the ship is spotted; the events deliver the real ones.
+        # Only the component references are cached.  Their VALUES are read every tick, so
+        # no change event is needed -- one would carry no payload the tick does not re-read.
         ship = _Ship(avatarId, entity.health,
                      entity.relation if entity.has(CC.relation) else None,
                      self._maxHealthMap.get(avatarId, 0))
-        # value/max drive the bar, isAlive gates the ship, relation picks the team.
-        self._subscribe(ship, ship.health, ('evValueChanged', 'evMaxChanged', 'evIsAliveChanged'))
-        self._subscribe(ship, ship.relation, ('evChanged',))
         self._ships[entity] = ship
         self._attachRegen(ship)
-        self._dirty = True
 
     def _unregister(self, entity):
-        ship = self._ships.pop(entity, None)
-        if ship is None:
-            return
-        for ev, handler in ship.subs:
-            try:
-                ev.remove(handler)
-            except:
-                pass
-        del ship.subs[:]
-        self._dirty = True
-
-    def _subscribe(self, ship, comp, names):
-        if comp is None:
-            return
-        for name in names:
-            ev = getattr(comp, name, None)
-            if ev is None:
-                continue
-            ev.add(self._markRef)
-            ship.subs.append((ev, self._markRef))
-
-    def _mark(self, *args):
-        self._dirty = True
+        self._ships.pop(entity, None)
 
     def _attachRegen(self, ship):
         # RegenMonitor creates the record with the avatar, so one lookup is enough.
@@ -239,30 +209,29 @@ class TeamHP(object):
         if comp is None:
             return
         ship.regen = comp
-        self._subscribe(ship, comp, ('evDataChanged',))
 
-    # ------------------------------------------------------------- the flush
-    def _startFlush(self):
+    # -------------------------------------------------------------- the tick
+    def _startTick(self):
         # callbacks.callback REPEATS: arm once, cancel in kill().
-        self._stopFlush()
-        self._flushTimer = callbacks.callback(_FLUSH_PERIOD, self._flush)
+        self._stopTick()
+        self._timer = callbacks.callback(_TICK_PERIOD, self._tick)
 
-    def _stopFlush(self):
-        handle = self._flushTimer
+    def _stopTick(self):
+        handle = self._timer
         if handle is None:
             return
-        self._flushTimer = None
+        self._timer = None
         try:
             callbacks.cancel(handle)
         except:
             pass
 
-    def _flush(self, *args):
-        if not self._dirty or self._entityId is None:
+    def _tick(self, *args):
+        if self._entityId is None:
             return
-        self._dirty = False
         totals = self._recompute()
-        # A salvo fires value events that can net out unchanged.
+        # Most ticks land on an unchanged total, so this is what keeps an idle battle
+        # from publishing.
         if totals == self._lastTotals:
             return
         self._lastTotals = totals
