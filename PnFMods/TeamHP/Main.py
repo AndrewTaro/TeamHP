@@ -12,9 +12,13 @@ ALLY_RELATIONS = (constants.PlayerRelation.SELF, constants.PlayerRelation.ALLY)
 COMPONENT_KEY = 'modTeamHP'
 REGEN_KEY_PREFIX = 'modRegenMonitor_'
 
-# The tick runs every frame but early-returns on one attribute read unless a health/regen
-# event set the dirty flag, so the recompute + publish happen only when something moved.
-_PROBE_EVERY = 15
+# CC.health's own system polls at 20 Hz on high UI quality and 5 Hz on low (confirmed by RE),
+# so nothing upstream of us moves faster than this.  A per-frame flush would spend most of its
+# wake-ups re-publishing numbers that cannot have changed.
+_FLUSH_PERIOD = 0.05
+# RegenMonitor writes a ship's record on that ship's first publish, which can land after the
+# roster event that registered it here.  This retries the ones still missing a record.
+_PROBE_PERIOD = 1.0
 
 
 def logInfo(*args):
@@ -74,14 +78,30 @@ def _mk():
 _CTX = _mk()
 
 
+class _Ship(object):
+    # __slots__ rather than a dict: this is read once per ship per flush, 20x/s.
+    __slots__ = ('health', 'relation', 'regen', 'maxFallback', 'subs')
+
+    def __init__(self, healthComp, relationComp, maxFallback):
+        self.health = healthComp
+        self.relation = relationComp
+        self.regen = None
+        self.maxFallback = maxFallback
+        self.subs = []
+
+
 class TeamHP(object):
     def __init__(self):
         self._entityId = None
         self._maxHealthMap = {}
-        self._ships = {}        # avatarId -> {health, relation, regen, subs}
+        self._ships = {}        # avatarId -> _Ship
         self._dirty = False
-        self._probeCounter = 0
-        self._tick = None
+        self._lastTotals = None
+        self._flushTimer = None
+        self._probeTimer = None
+        # One bound method for every subscription, so removal cannot depend on bound-method
+        # equality holding inside whatever container the event uses.
+        self._markRef = self._mark
         events.onBattleShown(self.init)
         events.onBattleEnd(self.kill)
         events.onPlayersListUpdated(self.onRosterChanged)
@@ -91,11 +111,11 @@ class TeamHP(object):
         self._createEntity()
         self._refreshMaxHealth()
         self._sync()
-        self._startTick()
+        self._startTimers()
         logInfo('Initialized')
 
     def kill(self, *args):
-        self._stopTick()
+        self._stopTimers()
         for avatarId in list(self._ships):
             self._unregister(avatarId)
         self._ships.clear()
@@ -111,9 +131,9 @@ class TeamHP(object):
         self._sync()
 
     def _refreshMaxHealth(self):
-        # PlayerInfo carries maxHealth even for ships whose health component still reads 0
-        # (spotted outside render range, or not yet spotted).  Converting PlayerInfo per frame
-        # was measured to be costly, so it is cached here on the roster event only.
+        # PlayerInfo carries maxHealth even while the ship's own health component still holds
+        # the stub 0 it is created with.  Converting PlayerInfo per frame was measured to be
+        # costly, so it is cached here on the roster event only.
         try:
             self._maxHealthMap = {aid: p.maxHealth for aid, p in battle.getPlayersInfo().iteritems()}
         except:
@@ -129,6 +149,7 @@ class TeamHP(object):
             self._removeEntity()
         self._entityId = ui.createUiElement()
         ui.addDataComponentWithId(self._entityId, COMPONENT_KEY, self._emptyData())
+        self._lastTotals = None
 
     def _removeEntity(self):
         try:
@@ -137,31 +158,38 @@ class TeamHP(object):
         except:
             pass
         self._entityId = None
+        self._lastTotals = None
 
     # ------------------------------------------------ per-ship subscriptions
     def _sync(self):
         seen = set()
+        maxHealthMap = self._maxHealthMap
         for fe in dataHub.getEntityCollections('avatar'):
             if CC.avatar not in fe:
                 continue
             avatarId = fe[CC.avatar].id
             seen.add(avatarId)
-            if avatarId in self._ships:
+            fallback = maxHealthMap.get(avatarId, 0)
+            ship = self._ships.get(avatarId)
+            if ship is not None:
+                # A later roster event can carry a maxHealth the first one did not.
+                ship.maxFallback = fallback
                 continue
             if CC.health not in fe:
-                # Health rides on the avatar entity; if it is not here yet the next roster
-                # event will pick the ship up.
+                # Health is expected on every avatar entity by this point, so a member without
+                # one is not a ship and has nothing to contribute.
                 continue
-            healthComp = fe[CC.health]
             relationComp = fe[CC.relation] if CC.relation in fe else None
-            self._register(avatarId, healthComp, relationComp)
+            self._register(avatarId, fe[CC.health], relationComp, fallback)
         for avatarId in list(self._ships):
             if avatarId not in seen:
                 self._unregister(avatarId)
         self._dirty = True
 
-    def _register(self, avatarId, healthComp, relationComp):
-        ship = {'health': healthComp, 'relation': relationComp, 'regen': None, 'subs': []}
+    def _register(self, avatarId, healthComp, relationComp, maxFallback):
+        # The component is present with stub values (0/0) long before the ship is spotted, so
+        # subscribe now and let the events deliver the real numbers.
+        ship = _Ship(healthComp, relationComp, maxFallback)
         # value / max drive the bar; isAlive gates every ship's contribution.
         for evName in ('evValueChanged', 'evMaxChanged', 'evIsAliveChanged'):
             self._subscribe(ship, getattr(healthComp, evName, None))
@@ -172,25 +200,25 @@ class TeamHP(object):
         ship = self._ships.pop(avatarId, None)
         if ship is None:
             return
-        for ev, handler in ship['subs']:
+        for ev, handler in ship.subs:
             try:
                 ev.remove(handler)
             except:
                 pass
-        del ship['subs'][:]
+        del ship.subs[:]
 
     def _subscribe(self, ship, ev):
         if ev is None:
             return
-        ev.add(self._mark)
-        ship['subs'].append((ev, self._mark))
+        ev.add(self._markRef)
+        ship.subs.append((ev, self._markRef))
 
     def _mark(self, *args):
         self._dirty = True
 
     # ------------------------------------------------------------- regen
     def _attachRegen(self, avatarId, ship):
-        if ship['regen'] is not None:
+        if ship.regen is not None:
             return
         c = self._ctx()
         if c is None:
@@ -200,20 +228,18 @@ class TeamHP(object):
         except:
             e = None
         if e is None:
-            # The source creates its record lazily on a ship's first publish, so this can be
-            # empty at roster time.  _probeRegen retries the ones still missing.
             return
         try:
             comp = e[CC.mods_DataComponent]
         except:
             return
-        ship['regen'] = comp
+        ship.regen = comp
         self._subscribe(ship, getattr(comp, 'evDataChanged', None))
         self._dirty = True
 
-    def _probeRegen(self):
+    def _probe(self, *args):
         for avatarId, ship in self._ships.iteritems():
-            if ship['regen'] is None:
+            if ship.regen is None:
                 self._attachRegen(avatarId, ship)
 
     def _ctx(self):
@@ -223,48 +249,71 @@ class TeamHP(object):
         return _CTX
 
     # ------------------------------------------------------------- the flush
-    def _startTick(self):
-        if self._tick is not None:
-            self._stopTick()
-        self._tick = callbacks.perTick(self._onTick)
+    def _startTimers(self):
+        # callbacks.callback REPEATS until cancelled, so these are armed once and never
+        # re-armed -- and both MUST be cancelled in kill() or they outlive the battle.
+        self._stopTimers()
+        self._flushTimer = callbacks.callback(_FLUSH_PERIOD, self._flush)
+        self._probeTimer = callbacks.callback(_PROBE_PERIOD, self._probe)
 
-    def _stopTick(self):
-        if self._tick is not None:
-            callbacks.cancel(self._tick)
-            self._tick = None
+    def _stopTimers(self):
+        for name in ('_flushTimer', '_probeTimer'):
+            handle = getattr(self, name)
+            if handle is None:
+                continue
+            # Clear the attribute first: a cancel that raises must not leave a handle that
+            # stop() would try again and a second start() would overwrite.
+            setattr(self, name, None)
+            try:
+                callbacks.cancel(handle)
+            except:
+                pass
 
-    def _onTick(self, *args):
-        self._probeCounter += 1
-        if self._probeCounter >= _PROBE_EVERY:
-            self._probeCounter = 0
-            self._probeRegen()
+    def _flush(self, *args):
         if not self._dirty or self._entityId is None:
             return
         self._dirty = False
-        ui.updateUiElementData(self._entityId, self._recompute())
+        totals = self._recompute()
+        # A salvo fires several events that can net out to the same totals (a hit on an
+        # already-dead ship, a max change that restores a value).  Comparing the tuple is far
+        # cheaper than marshalling a payload the view would redraw for nothing.
+        if totals == self._lastTotals:
+            return
+        self._lastTotals = totals
+        allyMax, allyCur, allyRegen, enemyMax, enemyCur, enemyRegen = totals
+        ui.updateUiElementData(self._entityId, {
+            'ally': {'maxHP': allyMax, 'currentHP': allyCur, 'maxRegen': allyRegen},
+            'enemy': {'maxHP': enemyMax, 'currentHP': enemyCur, 'maxRegen': enemyRegen}})
 
     def _recompute(self):
-        data = self._emptyData()
-        for avatarId, ship in self._ships.iteritems():
-            healthComp = ship['health']
-            relationComp = ship['relation']
-            team = 'ally' if (relationComp is not None and relationComp.value in ALLY_RELATIONS) else 'enemy'
-
-            maxHealth = healthComp.max if healthComp.max else self._maxHealthMap.get(avatarId, 0)
-            isAlive = healthComp.isAlive
-            currentHealth = healthComp.value if healthComp.value else maxHealth
-
-            regenComp = ship['regen']
-            if regenComp is not None and regenComp.data:
-                maxRegen = regenComp.data.get('maxValue', currentHealth)
+        # Hot path: every ship, 20x/s.  Scalar locals instead of nested dicts, __slots__
+        # instead of dict keys, and no allocation until the totals are known to have moved.
+        allyMax = allyCur = allyRegen = 0
+        enemyMax = enemyCur = enemyRegen = 0
+        allyRelations = ALLY_RELATIONS
+        for ship in self._ships.itervalues():
+            health = ship.health
+            # Both values fall back rather than reading 0: an unspotted ship still holds the
+            # stub, and until we hear otherwise it is at full health.
+            maxHealth = health.max or ship.maxFallback
+            relation = ship.relation
+            isAlly = relation is not None and relation.value in allyRelations
+            if health.isAlive:
+                current = health.value or maxHealth
+                regen = ship.regen
+                data = regen.data if regen is not None else None
+                maxRegen = data.get('maxValue', current) if data else current
+                if isAlly:
+                    allyCur += current
+                    allyRegen += maxRegen
+                else:
+                    enemyCur += current
+                    enemyRegen += maxRegen
+            if isAlly:
+                allyMax += maxHealth
             else:
-                maxRegen = currentHealth
-
-            bucket = data[team]
-            bucket['maxHP'] += maxHealth
-            bucket['currentHP'] += currentHealth * isAlive
-            bucket['maxRegen'] += maxRegen * isAlive
-        return data
+                enemyMax += maxHealth
+        return (allyMax, allyCur, allyRegen, enemyMax, enemyCur, enemyRegen)
 
 
 gTeamHP = TeamHP()
