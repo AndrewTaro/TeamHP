@@ -74,74 +74,66 @@ def _mk():
 _CTX = _mk()
 
 
-class _Ship(object):
-    # Resolved once per ship; the tick reads it, so keep it a slot lookup.
-    __slots__ = ('avatarId', 'health', 'relation', 'regen', 'maxFallback')
-
-    def __init__(self, avatarId, healthComp, relationComp, maxFallback):
-        self.avatarId = avatarId
-        self.health = healthComp
-        self.relation = relationComp
-        self.regen = None
-        self.maxFallback = maxFallback
-
-
 class TeamHP(object):
     def __init__(self):
         self._entityId = None
-        self._maxHealthMap = {}
-        self._ships = {}        # game avatar entity -> _Ship
+        self._records = {}      # avatarId -> {'maxHealth': int, 'regen': component|None}
         self._lastTotals = None
         self._timer = None
-        self._hooks = []
         events.onBattleShown(self.init)
         events.onBattleEnd(self.kill)
-        events.onPlayersListUpdated(self.onRosterChanged)
+        events.onPlayersListUpdated(self._refresh)
 
     # -------------------------------------------------------------- lifecycle
     def init(self, *args):
-        # Health, not avatar: this is the collection whose component we hold, and it need
-        # not arrive with the avatar.  Registering off avatars would need a retry.
-        healths = self._collection(CC.health)
-        if healths is None:
+        if self._collection(CC.avatar) is None:
             logError('no collection reach; publishing nothing')
             return
         self._createEntity()
-        self._refreshMaxHealth()
-        self._hooks = [(healths.evAdded, self._onHealthAdded),
-                       (healths.evRemoved, self._onHealthRemoved)]
-        for ev, handler in self._hooks:
-            ev.add(handler)
-        for entity in healths:
-            self._register(entity)
+        self._refresh()
         self._startTick()
         logInfo('Initialized')
 
     def kill(self, *args):
         self._stopTick()
-        for ev, handler in self._hooks:
-            try:
-                ev.remove(handler)
-            except:
-                pass
-        del self._hooks[:]
-        self._ships.clear()
-        self._maxHealthMap.clear()
+        self._records.clear()
         self._removeEntity()
         logInfo('Killed')
 
-    def onRosterChanged(self, *args):
-        self._refreshMaxHealth()
-
-    def _refreshMaxHealth(self):
-        # PlayerInfo is the only maxHealth source while a ship holds its stub 0.
-        # Converting it per frame was measured costly, so it is cached per roster event.
+    def _refresh(self, *args):
+        # PlayerInfo is the only maxHealth source while a ship still holds the stub 0 it
+        # is created with, and converting one was measured costly, so it is read on the
+        # roster event only.  The regen record rides along: RegenMonitor creates it with
+        # the avatar, and this is the point where a re-added avatar's is picked up again.
         try:
-            self._maxHealthMap = {aid: p.maxHealth for aid, p in battle.getPlayersInfo().iteritems()}
+            players = battle.getPlayersInfo()
         except:
             return
-        for ship in self._ships.itervalues():
-            ship.maxFallback = self._maxHealthMap.get(ship.avatarId, 0)
+        records = {}
+        for avatarId, player in players.iteritems():
+            records[avatarId] = {'maxHealth': player.maxHealth,
+                                 'regen': self._regen(avatarId)}
+        self._records = records
+
+    def _regen(self, avatarId):
+        if _CTX is None:
+            return None
+        try:
+            e = getattr(_CTX, _N[4])(REGEN_KEY_PREFIX + str(avatarId), CC.mods_DataComponent)
+            return e.mods_DataComponent if e is not None else None
+        except:
+            return None
+
+    def _collection(self, componentId):
+        # The gate's getEntityCollections rebuilds a wrapper per entity per call.  This
+        # is the real collection, and it is the exact set of players -- the health one
+        # also holds squadrons, whose health.max is a plane count.
+        if _CTX is None:
+            return None
+        try:
+            return getattr(_CTX, _N[5])[componentId]
+        except:
+            return None
 
     # ------------------------------------------------------- our own DH entity
     def _emptyData(self):
@@ -164,52 +156,6 @@ class TeamHP(object):
         self._entityId = None
         self._lastTotals = None
 
-    # ------------------------------------------------------- the ship cache
-    def _collection(self, componentId):
-        # The gate's getEntityCollections rebuilds a wrapper per entity per call and has
-        # no add/remove event.  The real collection has both.
-        if _CTX is None:
-            return None
-        try:
-            return getattr(_CTX, _N[5])[componentId]
-        except:
-            return None
-
-    def _onHealthAdded(self, entity):
-        self._register(entity)
-
-    def _onHealthRemoved(self, entity):
-        self._unregister(entity)
-
-    def _register(self, entity):
-        # The health collection also holds buildings; only avatars are ships.
-        if entity in self._ships or not entity.has(CC.avatar):
-            return
-        avatarId = entity.avatar.id
-        # Only the component references are cached.  Their VALUES are read every tick, so
-        # no change event is needed -- one would carry no payload the tick does not re-read.
-        ship = _Ship(avatarId, entity.health,
-                     entity.relation if entity.has(CC.relation) else None,
-                     self._maxHealthMap.get(avatarId, 0))
-        self._ships[entity] = ship
-        self._attachRegen(ship)
-
-    def _unregister(self, entity):
-        self._ships.pop(entity, None)
-
-    def _attachRegen(self, ship):
-        # RegenMonitor creates the record with the avatar, so one lookup is enough.
-        if _CTX is None:
-            return
-        try:
-            e = getattr(_CTX, _N[4])(REGEN_KEY_PREFIX + str(ship.avatarId), CC.mods_DataComponent)
-            comp = e.mods_DataComponent if e is not None else None
-        except:
-            return
-        if comp is None:
-            return
-        ship.regen = comp
-
     # -------------------------------------------------------------- the tick
     def _startTick(self):
         # callbacks.callback REPEATS: arm once, cancel in kill().
@@ -227,9 +173,10 @@ class TeamHP(object):
             pass
 
     def _tick(self, *args):
-        if self._entityId is None:
+        avatars = self._collection(CC.avatar)
+        if avatars is None or self._entityId is None:
             return
-        totals = self._recompute()
+        totals = self._totals(avatars)
         # Most ticks land on an unchanged total, so this is what keeps an idle battle
         # from publishing.
         if totals == self._lastTotals:
@@ -240,19 +187,24 @@ class TeamHP(object):
             'ally': {'maxHP': allyMax, 'currentHP': allyCur, 'maxRegen': allyRegen},
             'enemy': {'maxHP': enemyMax, 'currentHP': enemyCur, 'maxRegen': enemyRegen}})
 
-    def _recompute(self):
+    def _totals(self, avatars):
         allyMax = allyCur = allyRegen = 0
         enemyMax = enemyCur = enemyRegen = 0
         allyRelations = ALLY_RELATIONS
-        for ship in self._ships.itervalues():
-            health = ship.health
-            # An unspotted ship holds the stub, so treat it as untouched.
-            maxHealth = health.max or ship.maxFallback
-            relation = ship.relation
+        records = self._records
+        for entity in avatars:
+            if not entity.has(CC.health):
+                # Health can lag the avatar; the next tick picks the ship up.
+                continue
+            health = entity.health
+            record = records.get(entity.avatar.id)
+            # An unspotted ship holds the stub, so read it as untouched.
+            maxHealth = health.max or (record['maxHealth'] if record else 0)
+            relation = entity.relation if entity.has(CC.relation) else None
             isAlly = relation is not None and relation.value in allyRelations
             if health.isAlive:
                 current = health.value or maxHealth
-                regen = ship.regen
+                regen = record['regen'] if record else None
                 data = regen.data if regen is not None else None
                 # 0 is RegenMonitor's "no figure": no repair party, or none computed yet.
                 maxRegen = (data.get('maxValue') or current) if data else current
