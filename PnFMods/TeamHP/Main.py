@@ -103,8 +103,8 @@ class TeamHP(object):
 
     # -------------------------------------------------------------- lifecycle
     def init(self, *args):
-        # Health, not avatar: it lands on the entity AFTER the avatar component, so an
-        # avatar-driven registration would need a retry for the ones that arrive late.
+        # Health, not avatar: this is the collection whose component we hold, and it need
+        # not arrive with the avatar.  Registering off avatars would need a retry.
         healths = self._collection(CC.health)
         if healths is None:
             logError('no collection reach; publishing nothing')
