@@ -46,11 +46,11 @@
         (var currentHP:number = "'currentHP' in teamData ? teamData.currentHP : 0")
         (var maxRegen:number = "'maxRegen' in teamData ? teamData.maxRegen : 0")
 
-        (macro TT_GET_PREF _varName="'lockPref'" _key="'teamHP.disableDragdrop'")
+        (macro TT_GET_PREF _varName="'lockPref'" _key="'teamHP.disableDragDrop'")
         (var isPositionLocked:bool = "null != lockPref && null != lockPref.value ? lockPref.value : false")
 
         # Per-team key PREFIX, built at runtime -- ally and enemy are two independent subtrees of the
-        # schema, so the dotted key is composed at each call site (`revPref + '.styleIndex'`);
+        # schema, so the dotted key is composed at each call site (`revPref + '.layout'`);
         # TT_GET_PREF's _key takes the built expression.  The draggables hang off the same prefix as
         # `<prefix>.position` -- a position key is never the prefix itself, or its opaque bucket map
         # would share a node with the siblings here and eat them (see the framework's BUILD_STATE #2).
@@ -58,7 +58,7 @@
 
         # Ally and enemy carry DIFFERENT schema defaults for both dropdowns, so the pre-publish
         # fallback is per-team too.
-        (macro TT_GET_PREF _varName="'stylePref'" _key="revPref + '.styleIndex'")
+        (macro TT_GET_PREF _varName="'stylePref'" _key="revPref + '.layout'")
         (var styleIndex:number = "null != stylePref && null != stylePref.value ? stylePref.value : _isAlly ? THP_STYLES.HP_AND_BAR : THP_STYLES.BAR_AND_HP")
         (var isReversed:bool = "styleIndex == THP_STYLES.HP_AND_BAR")
         (var flowDir:number = "isReversed ? Flow.REVERSE_HORIZONTAL : Flow.HORIZONTAL")
@@ -176,7 +176,7 @@
         (var blockHeight:number = "blockHeightPref.value")
         (macro TT_GET_PREF _varName="'blockWidthPref'" _key="'teamHP.style.block.width'")
         (var blockWidth:number = "blockWidthPref.value")
-        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'teamHP.style.block.margin'")
+        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'teamHP.style.block.gap'")
         (var blockMargin:number = "null != blockMarginPref && null != blockMarginPref.value ? blockMarginPref.value : 1")
 
         # blockCount drives RELATIVE mode, healthPerBlock ABSOLUTE -- healthType picks which; the other
@@ -185,7 +185,7 @@
         (var blockCount:number = "null != blockCountPref && null != blockCountPref.value ? blockCountPref.value : 20")
         (macro TT_GET_PREF _varName="'blockHealthPref'" _key="'teamHP.style.block.health'")
         (var healthPerBlock:number = "null != blockHealthPref && null != blockHealthPref.value ? blockHealthPref.value : 30000")
-        (macro TT_GET_PREF _varName="'healthTypePref'" _key="'teamHP.healthType'")
+        (macro TT_GET_PREF _varName="'healthTypePref'" _key="'teamHP.healthScale'")
         (var healthType:number = "null != healthTypePref && null != healthTypePref.value ? healthTypePref.value : THP_HEALTH_TYPES.RELATIVE")
 
         (var isRelativeMode:bool = "healthType == THP_HEALTH_TYPES.RELATIVE")
@@ -291,7 +291,7 @@
         (var hpText:str = "hpKilo < 100 ? formatFloatingPoint(hpKilo) : ceil(hpKilo)")
         (var displayHP:str = "hpText + 'K' ")
 
-        (macro TT_GET_PREF _varName="'fontSizePref'" _key="'teamHP.style.fontSize'")
+        (macro TT_GET_PREF _varName="'fontSizePref'" _key="'teamHP.style.font.size'")
         (var fontSize:number = "null != fontSizePref && null != fontSizePref.value ? fontSizePref.value : 18")
     )
     (style
