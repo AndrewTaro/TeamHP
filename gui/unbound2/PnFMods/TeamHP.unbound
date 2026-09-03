@@ -46,7 +46,7 @@
         (var currentHP:number = "'currentHP' in teamData ? teamData.currentHP : 0")
         (var maxRegen:number = "'maxRegen' in teamData ? teamData.maxRegen : 0")
 
-        (macro TT_GET_PREF _varName="'lockPref'" _key="'teamHP.disableDragDrop'")
+        (macro TT_GET_PREF _varName="'lockPref'" _key="'ttaro.teamHP.disableDragDrop'")
         (var isPositionLocked:bool = "null != lockPref && null != lockPref.value ? lockPref.value : false")
 
         # Per-team key PREFIX, built at runtime -- ally and enemy are two independent subtrees of the
@@ -54,7 +54,7 @@
         # TT_GET_PREF's _key takes the built expression.  The draggables hang off the same prefix as
         # `<prefix>.position` -- a position key is never the prefix itself, or its opaque bucket map
         # would share a node with the siblings here and eat them (see the framework's BUILD_STATE #2).
-        (var revPref:str = "_isAlly ? 'teamHP.ally' : 'teamHP.enemy'")
+        (var revPref:str = "_isAlly ? 'ttaro.teamHP.ally' : 'ttaro.teamHP.enemy'")
 
         # Ally and enemy carry DIFFERENT schema defaults for both dropdowns, so the pre-publish
         # fallback is per-team too.
@@ -71,14 +71,14 @@
 	    (var altVision:bool = "cameraComponent ? cameraComponent.altVision : false" (event "cameraComponent.evAltVisionChanged"))
 
         # BG
-        (macro TT_GET_PREF _varName="'bgAlphaPref'" _key="'teamHP.background.alpha'")
+        (macro TT_GET_PREF _varName="'bgAlphaPref'" _key="'ttaro.teamHP.background.alpha'")
         (var bgAlpha:number = "null != bgAlphaPref && null != bgAlphaPref.value ? bgAlphaPref.value : 0.4")
-        (macro TT_GET_PREF _varName="'bgModePref'" _key="'teamHP.background.displayMode'")
+        (macro TT_GET_PREF _varName="'bgModePref'" _key="'ttaro.teamHP.background.displayMode'")
         (var bgDisplayMode:number = "null != bgModePref && null != bgModePref.value ? bgModePref.value : TT_CONST.DISPLAY_MODE.DISABLED")
         (var isBGVisible:bool = "bgDisplayMode == TT_CONST.DISPLAY_MODE.ADAPTIVE ? altVision : bgDisplayMode")
 
         # Main
-        (macro TT_GET_PREF _varName="'displayModePref'" _key="'teamHP.displayMode'")
+        (macro TT_GET_PREF _varName="'displayModePref'" _key="'ttaro.teamHP.displayMode'")
         (var displayMode:number = "null != displayModePref && null != displayModePref.value ? displayModePref.value : TT_CONST.DISPLAY_MODE.ENABLED")
         (var isVisible:bool = "maxHP ? displayMode == TT_CONST.DISPLAY_MODE.ADAPTIVE ? altVision
                                                                                     : displayMode
@@ -168,24 +168,24 @@
 
 (def element THP_TeamHealthBar(_currentHP:number, _maxHP:number, _maxRegen:number, _isAlly:bool=true)
     (scope
-        (var revPref:str = "_isAlly ? 'teamHP.ally' : 'teamHP.enemy'")
+        (var revPref:str = "_isAlly ? 'ttaro.teamHP.ally' : 'ttaro.teamHP.enemy'")
         (macro TT_GET_PREF _varName="'barDirPref'" _key="revPref + '.barDirection'")
         (var barDirection:number = "null != barDirPref && null != barDirPref.value ? barDirPref.value : _isAlly ? THP_BAR_DIRECTIONS.LEFT : THP_BAR_DIRECTIONS.RIGHT")
 
-        (macro TT_GET_PREF _varName="'blockHeightPref'" _key="'teamHP.style.block.height'")
+        (macro TT_GET_PREF _varName="'blockHeightPref'" _key="'ttaro.teamHP.style.block.height'")
         (var blockHeight:number = "blockHeightPref.value")
-        (macro TT_GET_PREF _varName="'blockWidthPref'" _key="'teamHP.style.block.width'")
+        (macro TT_GET_PREF _varName="'blockWidthPref'" _key="'ttaro.teamHP.style.block.width'")
         (var blockWidth:number = "blockWidthPref.value")
-        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'teamHP.style.block.gap'")
+        (macro TT_GET_PREF _varName="'blockMarginPref'" _key="'ttaro.teamHP.style.block.gap'")
         (var blockMargin:number = "null != blockMarginPref && null != blockMarginPref.value ? blockMarginPref.value : 1")
 
         # blockCount drives RELATIVE mode, healthPerBlock ABSOLUTE -- healthType picks which; the other
         # setting is greyed in the config panel but still reads its stored value here.
-        (macro TT_GET_PREF _varName="'blockCountPref'" _key="'teamHP.style.block.count'")
+        (macro TT_GET_PREF _varName="'blockCountPref'" _key="'ttaro.teamHP.style.block.count'")
         (var blockCount:number = "null != blockCountPref && null != blockCountPref.value ? blockCountPref.value : 20")
-        (macro TT_GET_PREF _varName="'blockHealthPref'" _key="'teamHP.style.block.health'")
+        (macro TT_GET_PREF _varName="'blockHealthPref'" _key="'ttaro.teamHP.style.block.health'")
         (var healthPerBlock:number = "null != blockHealthPref && null != blockHealthPref.value ? blockHealthPref.value : 30000")
-        (macro TT_GET_PREF _varName="'healthTypePref'" _key="'teamHP.healthScale'")
+        (macro TT_GET_PREF _varName="'healthTypePref'" _key="'ttaro.teamHP.healthScale'")
         (var healthType:number = "null != healthTypePref && null != healthTypePref.value ? healthTypePref.value : THP_HEALTH_TYPES.RELATIVE")
 
         (var isRelativeMode:bool = "healthType == THP_HEALTH_TYPES.RELATIVE")
@@ -291,7 +291,7 @@
         (var hpText:str = "hpKilo < 100 ? formatFloatingPoint(hpKilo) : ceil(hpKilo)")
         (var displayHP:str = "hpText + 'K' ")
 
-        (macro TT_GET_PREF _varName="'fontSizePref'" _key="'teamHP.style.font.size'")
+        (macro TT_GET_PREF _varName="'fontSizePref'" _key="'ttaro.teamHP.style.font.size'")
         (var fontSize:number = "null != fontSizePref && null != fontSizePref.value ? fontSizePref.value : 18")
     )
     (style
