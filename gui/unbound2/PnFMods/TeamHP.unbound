@@ -5,7 +5,7 @@
 (def constant THP_TEXT_WIDTH 55px)
 
 # The off/on/alt-vision triple is shared as TT_CONST.DISPLAY_MODE {DISABLED,ENABLED,ADAPTIVE}
-# (TTaroModConfigSharedConstants.unbound) -- never re-declare a per-mod copy of it.
+# (TTaroModUtilsSharedConstants.unbound) -- never re-declare a per-mod copy of it.
 (def constant THP_STYLES {
 	HP_AND_BAR   : 0,
 	BAR_AND_HP   : 1,
