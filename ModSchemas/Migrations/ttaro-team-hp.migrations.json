@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 4,
+  "opVocabularyVersion": 1,
+  "slug": "team-hp",
+  "migrations": [
+    {
+      "version": 1,
+      "description": "flat keys → dotted ancestry keys; slider step index → value",
+      "ops": [
+        {
+          "op": "rename",
+          "from": "teamHPAllyBarDirection",
+          "to": "teamHP.ally.barDirection"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPAllyStyleIndex",
+          "to": "teamHP.ally.layout"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPBackgroundDisplayMode",
+          "to": "teamHP.background.displayMode"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPBackgroundOpacity",
+          "to": "teamHP.background.alpha"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPBlockCount",
+          "to": "teamHP.style.block.count"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPBlockHealth",
+          "to": "teamHP.style.block.health"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPBlockMargin",
+          "to": "teamHP.style.block.gap"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPDisableDragDrop",
+          "to": "teamHP.disableDragDrop"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPDisplayMode",
+          "to": "teamHP.displayMode"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPEnemyBarDirection",
+          "to": "teamHP.enemy.barDirection"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPEnemyStyleIndex",
+          "to": "teamHP.enemy.layout"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPFontSize",
+          "to": "teamHP.style.font.size"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPHealthType",
+          "to": "teamHP.healthScale"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPHeightScale",
+          "to": "teamHP.style.block.height"
+        },
+        {
+          "op": "rename",
+          "from": "teamHPWidthScale",
+          "to": "teamHP.style.block.width"
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.background.alpha",
+          "to": "teamHP.background.alpha",
+          "transform": "stepIndex",
+          "args": {
+            "min": 0.1,
+            "step": 0.1
+          }
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.style.block.count",
+          "to": "teamHP.style.block.count",
+          "transform": "stepIndex",
+          "args": {
+            "min": 10,
+            "step": 1
+          }
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.style.block.gap",
+          "to": "teamHP.style.block.gap",
+          "transform": "stepIndex",
+          "args": {
+            "min": 0,
+            "step": 0.5
+          }
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.style.block.health",
+          "to": "teamHP.style.block.health",
+          "transform": "stepIndex",
+          "args": {
+            "min": 10000,
+            "step": 5000
+          }
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.style.block.height",
+          "to": "teamHP.style.block.height",
+          "transform": "stepIndex",
+          "args": {
+            "min": 10,
+            "step": 2
+          }
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.style.block.width",
+          "to": "teamHP.style.block.width",
+          "transform": "stepIndex",
+          "args": {
+            "min": 5,
+            "step": 1
+          }
+        },
+        {
+          "op": "transform",
+          "from": "teamHP.style.font.size",
+          "to": "teamHP.style.font.size",
+          "transform": "stepIndex",
+          "args": {
+            "min": 13,
+            "step": 1
+          }
+        }
+      ]
+    }
+  ],
+  "legacyPositions": [
+    {
+      "key": "teamHP.ally.position",
+      "element": "teamHPAlly"
+    },
+    {
+      "key": "teamHP.enemy.position",
+      "element": "teamHPEnemy"
+    }
+  ]
+}
