@@ -1,11 +1,11 @@
 {
   "schemaVersion": 4,
-  "opVocabularyVersion": 1,
+  "opVocabularyVersion": 3,
   "slug": "team-hp",
   "migrations": [
     {
       "version": 1,
-      "description": "flat keys → dotted ancestry keys; slider step index → value",
+      "description": "flat keys → dotted ancestry keys; legacy values decoded and folded onto the derived keys",
       "ops": [
         {
           "op": "rename",
@@ -21,26 +21,6 @@
           "op": "rename",
           "from": "teamHPBackgroundDisplayMode",
           "to": "teamHP.background.displayMode"
-        },
-        {
-          "op": "rename",
-          "from": "teamHPBackgroundOpacity",
-          "to": "teamHP.background.alpha"
-        },
-        {
-          "op": "rename",
-          "from": "teamHPBlockCount",
-          "to": "teamHP.style.block.count"
-        },
-        {
-          "op": "rename",
-          "from": "teamHPBlockHealth",
-          "to": "teamHP.style.block.health"
-        },
-        {
-          "op": "rename",
-          "from": "teamHPBlockMargin",
-          "to": "teamHP.style.block.gap"
         },
         {
           "op": "rename",
@@ -64,92 +44,182 @@
         },
         {
           "op": "rename",
-          "from": "teamHPFontSize",
-          "to": "teamHP.style.font.size"
-        },
-        {
-          "op": "rename",
           "from": "teamHPHealthType",
           "to": "teamHP.healthScale"
         },
         {
-          "op": "rename",
-          "from": "teamHPHeightScale",
-          "to": "teamHP.style.block.height"
-        },
-        {
-          "op": "rename",
-          "from": "teamHPWidthScale",
-          "to": "teamHP.style.block.width"
-        },
-        {
           "op": "transform",
-          "from": "teamHP.background.alpha",
+          "transform": "compose",
           "to": "teamHP.background.alpha",
-          "transform": "stepIndex",
-          "args": {
-            "min": 0.1,
-            "step": 0.1
+          "sources": [
+            {
+              "key": "teamHPBackgroundOpacity"
+            }
+          ],
+          "value": {
+            "add": [
+              0.1,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  0.1
+                ]
+              }
+            ]
           }
         },
         {
           "op": "transform",
-          "from": "teamHP.style.block.count",
+          "transform": "compose",
           "to": "teamHP.style.block.count",
-          "transform": "stepIndex",
-          "args": {
-            "min": 10,
-            "step": 1
+          "sources": [
+            {
+              "key": "teamHPBlockCount"
+            }
+          ],
+          "value": {
+            "add": [
+              10,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  1
+                ]
+              }
+            ]
           }
         },
         {
           "op": "transform",
-          "from": "teamHP.style.block.gap",
+          "transform": "compose",
           "to": "teamHP.style.block.gap",
-          "transform": "stepIndex",
-          "args": {
-            "min": 0,
-            "step": 0.5
+          "sources": [
+            {
+              "key": "teamHPBlockMargin"
+            }
+          ],
+          "value": {
+            "add": [
+              0,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  0.5
+                ]
+              }
+            ]
           }
         },
         {
           "op": "transform",
-          "from": "teamHP.style.block.health",
+          "transform": "compose",
           "to": "teamHP.style.block.health",
-          "transform": "stepIndex",
-          "args": {
-            "min": 10000,
-            "step": 5000
+          "sources": [
+            {
+              "key": "teamHPBlockHealth"
+            }
+          ],
+          "value": {
+            "add": [
+              10000,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  5000
+                ]
+              }
+            ]
           }
         },
         {
           "op": "transform",
-          "from": "teamHP.style.block.height",
+          "transform": "compose",
           "to": "teamHP.style.block.height",
-          "transform": "stepIndex",
-          "args": {
-            "min": 10,
-            "step": 2
+          "sources": [
+            {
+              "key": "teamHPHeightScale"
+            }
+          ],
+          "value": {
+            "add": [
+              10,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  2
+                ]
+              }
+            ]
           }
         },
         {
           "op": "transform",
-          "from": "teamHP.style.block.width",
+          "transform": "compose",
           "to": "teamHP.style.block.width",
-          "transform": "stepIndex",
-          "args": {
-            "min": 5,
-            "step": 1
+          "sources": [
+            {
+              "key": "teamHPWidthScale"
+            }
+          ],
+          "value": {
+            "add": [
+              5,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  1
+                ]
+              }
+            ]
           }
         },
         {
           "op": "transform",
-          "from": "teamHP.style.font.size",
+          "transform": "compose",
           "to": "teamHP.style.font.size",
-          "transform": "stepIndex",
-          "args": {
-            "min": 13,
-            "step": 1
+          "sources": [
+            {
+              "key": "teamHPFontSize"
+            }
+          ],
+          "value": {
+            "add": [
+              13,
+              {
+                "mul": [
+                  {
+                    "round": {
+                      "src": 0
+                    }
+                  },
+                  1
+                ]
+              }
+            ]
           }
         }
       ]
