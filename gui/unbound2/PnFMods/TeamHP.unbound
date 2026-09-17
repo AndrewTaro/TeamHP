@@ -1,6 +1,4 @@
-# Install gating comes from modPrefs.installedMods (Python-scanned), so a consumer no longer advertises
-# itself with a TT_<MOD>_INSTALLED constant.  There is no element-name constant either: that string was
-# the legacy chatBoxWidth position prefix, and Python owns positions + resKey now.
+# Install gating comes from modPrefs.installedMods (Python-scanned).  Python owns positions + resKey.
 (def constant THP_COMPONENT_KEY 'modTeamHP')
 (def constant THP_TEXT_WIDTH 55px)
 

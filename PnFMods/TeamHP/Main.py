@@ -104,7 +104,7 @@ class TeamHP(object):
     # ----------------------------------------------------------- the records
     def _updatePlayerRecords(self, *args):
         # PlayerInfo is the only maxHealth source while a ship still holds the stub 0 it
-        # is created with, and converting one was measured costly, so it is read on the
+        # is created with, and converting one is costly, so it is read on the
         # roster event only.  Updated in place: 'regen' resolves lazily and must survive.
         try:
             players = battle.getPlayersInfo()
