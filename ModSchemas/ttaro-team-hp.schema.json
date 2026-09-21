@@ -45,7 +45,7 @@
           "label": "IDS_TT_HEALTH_TYPE",
           "hint": {
             "text": "IDS_TT_HINT_HEALTH_TYPE",
-            "image": "team_hp/health_type.png"
+            "image": "hints/health_type.png"
           },
           "default": 0,
           "options": [
