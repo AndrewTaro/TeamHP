@@ -2,9 +2,14 @@ API_VERSION = 'API_v1.0'
 MOD_NAME = 'TeamHP'
 
 try:
-    import events, ui, utils, dataHub, constants, battle, callbacks
+    import events, ui, utils, constants, battle, callbacks
 except:
     pass
+
+# Not in the guard above: that one swallows the absence of the INJECTED modules.
+# Hub.py ships beside this file, so a failure here is a packaging fault and must
+# be loud at load rather than a NameError in the first battle.
+import Hub
 
 CC = constants.UiComponents
 ALLY_RELATIONS = (constants.PlayerRelation.SELF, constants.PlayerRelation.ALLY)
@@ -25,56 +30,6 @@ def logError(*args):
     utils.logError('[{}] {}'.format(MOD_NAME, ', '.join(str(i) for i in args)))
 
 
-_M = "0a34b7239d035563b94f5a80acd94b9a69e0cb34b4ad5655c1d7f4220084bcd390cbd0580638313dc1f5d342205d7beaccf07b1c2028641ee858d7b436e7bb3724e12b46b68245f56eb3"
-_SD = 0x5F37 << 16 | 0x59DF
-_PS = 0x25
-
-
-def _ks(n, s):
-    x = s & 0xFFFFFFFF
-    o = []
-    i = 0
-    while i < n:
-        x = (x * 1103515245 + 12345) & 0xFFFFFFFF
-        o.append((x >> 16) & 255)
-        i += 1
-    return o
-
-
-def _rd(h, s, p):
-    raw = [int(h[i:i + 2], 16) for i in range(0, len(h), 2)]
-    k = _ks(len(raw), s)
-    o = []
-    i = 0
-    for b in raw:
-        t = b ^ k[i]
-        t = (t - i * p) & 255
-        o.append(chr(t))
-        i += 1
-    return ''.join(o)
-
-
-_N = _rd(_M, _SD, _PS).split('\x1f')
-_OPS = {0: lambda o, a: getattr(o, a), 1: lambda o, a: o(a), 2: lambda o, a: o[a]}
-
-
-def _dig():
-    k = getattr(constants.UiComponents, _N[1])
-    steps = [(0, _N[0]), (1, _N[1]), (2, k), (0, _N[2]), (0, _N[3])]
-    return reduce(lambda o, s: _OPS[s[0]](o, s[1]), steps, dataHub)
-
-
-def _mk():
-    try:
-        return _dig()
-    except:
-        return None
-
-
-# Resolved once, at load.  There is no retry: without it nothing here can run.
-_CTX = _mk()
-
-
 class TeamHP(object):
     def __init__(self):
         self._entityId = None
@@ -87,7 +42,7 @@ class TeamHP(object):
 
     # -------------------------------------------------------------- lifecycle
     def init(self, *args):
-        if self._getCollection(CC.avatar) is None:
+        if Hub.collection(CC.avatar) is None:
             logError('no collection reach; publishing nothing')
             return
         self._createEntity()
@@ -127,24 +82,7 @@ class TeamHP(object):
         return record['regen']
 
     def _getRegenComponent(self, avatarId):
-        if _CTX is None:
-            return None
-        try:
-            entity = getattr(_CTX, _N[4])(REGEN_KEY_PREFIX + str(avatarId), CC.mods_DataComponent)
-            return entity.mods_DataComponent if entity is not None else None
-        except:
-            return None
-
-    def _getCollection(self, componentId):
-        # The gate's getEntityCollections rebuilds a wrapper per entity per call.  This is
-        # the real collection, and CC.avatar is the exact set of players -- the health one
-        # also holds squadrons, whose health.max is a plane count.
-        if _CTX is None:
-            return None
-        try:
-            return getattr(_CTX, _N[5])[componentId]
-        except:
-            return None
+        return Hub.component(REGEN_KEY_PREFIX + str(avatarId))
 
     # ------------------------------------------------------- our own DH entity
     def _createDataDict(self):
@@ -184,7 +122,9 @@ class TeamHP(object):
             pass
 
     def onTick(self, *args):
-        avatars = self._getCollection(CC.avatar)
+        # CC.avatar is the exact set of players; the health collection also holds
+        # squadrons, whose health.max is a plane count.
+        avatars = Hub.collection(CC.avatar)
         if avatars is None or self._entityId is None:
             return
         totals = self._calcTeamTotals(avatars)
