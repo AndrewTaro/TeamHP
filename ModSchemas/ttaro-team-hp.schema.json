@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "id": "cmtkswux0000iv0149valt5jb",
   "author": "ttaro",
   "modName": "Team HP",
@@ -9,6 +9,7 @@
     {
       "kind": "group",
       "key": "cmtktamhg00gnv0d4k4ct9bte",
+      "display": "section",
       "label": "IDS_TT_TITLE_GENERAL",
       "collapse": "expanded",
       "children": [
@@ -75,12 +76,13 @@
     {
       "kind": "group",
       "key": "cmtktalz0001xv0d4jncxw5oo",
+      "display": "section",
       "label": "IDS_TT_APPEARANCE",
       "children": [
         {
           "kind": "group",
           "key": "cmt4us0go000yv0rwjrdgwdwa",
-          "aggregate": "inline",
+          "display": "transparent",
           "children": [
             {
               "kind": "setting",
@@ -98,6 +100,7 @@
         {
           "kind": "group",
           "key": "cmsxgbamu0002v0ekp0i8a1mx",
+          "display": "section",
           "label": "IDS_TT_TITLE_BLOCKS",
           "collapse": "expanded",
           "children": [
@@ -191,6 +194,7 @@
     {
       "kind": "group",
       "key": "cmtktam5n006zv0d47lpusiv7",
+      "display": "section",
       "label": "IDS_TT_TITLE_HEALTH_ALLY",
       "collapse": "expanded",
       "children": [
@@ -252,6 +256,7 @@
     {
       "kind": "group",
       "key": "cmtktam890091v0d4jjihhequ",
+      "display": "section",
       "label": "IDS_TT_TITLE_HEALTH_ENEMY",
       "collapse": "expanded",
       "children": [
@@ -313,6 +318,7 @@
     {
       "kind": "group",
       "key": "cmtktammv00kbv0d4h94p3tf8",
+      "display": "section",
       "label": "IDS_TT_TITLE_BACKGROUND",
       "collapse": "expanded",
       "children": [
