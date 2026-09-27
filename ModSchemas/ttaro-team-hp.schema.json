@@ -5,6 +5,7 @@
   "modName": "Team HP",
   "slug": "team-hp",
   "order": 18,
+  "migrationVersion": 1,
   "tree": [
     {
       "kind": "group",
